@@ -19,6 +19,7 @@ export function search(input, template) {
 
 /* Serveurs Wisp publics — le premier qui répond est utilisé (mercurywork.shop = officiel) */
 const WISP_SERVERS = ["wss://wisp.mercurywork.shop/", "wss://anura.pro/wisp/"];
+let wispIdx = 0;
 let wispUrl = WISP_SERVERS[0];
 async function pickWisp() {
   for (const u of WISP_SERVERS) {
@@ -30,8 +31,18 @@ async function pickWisp() {
         ws.onerror = () => { clearTimeout(t); res(false); };
       } catch (e) { res(false); }
     });
-    if (ok) { wispUrl = u; return u; }
+    if (ok) { wispUrl = u; wispIdx = WISP_SERVERS.indexOf(u); return u; }
   }
+  return wispUrl;
+}
+
+/* Bascule vers le serveur wisp suivant (utilisé quand un site échoue sur le serveur actuel) */
+export async function rotateWisp() {
+  wispIdx = (wispIdx + 1) % WISP_SERVERS.length;
+  wispUrl = WISP_SERVERS[wispIdx];
+  try {
+    await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]);
+  } catch (e) {}
   return wispUrl;
 }
 

@@ -1,5 +1,5 @@
 import { getFavicon, rAlert } from "./utils.mjs";
-import { getUV, search } from "./prxy.mjs";
+import { getUV, search, rotateWisp } from "./prxy.mjs";
 
 const { span, iframe, button, img } = van.tags;
 const {
@@ -51,8 +51,19 @@ pageRefresh.onclick = () => {
 };
 
 newTabButton.onclick = () => {
-  addTab("uvsearch.rhw.one");
+  addTab("https://www.bing.com");
 };
+
+// Barre latérale : bouton pour la masquer/réduire (logo V2, onglets)
+const sidebarToggle = document.getElementById("sidebar-toggle");
+function setSidebar(open) {
+  sideBar.classList.toggle("closed", !open);
+  tabView.classList.toggle("full-width", !open);
+  document.body.classList.toggle("sidebar-off", !open);
+  localStorage.setItem("uv-sidebar", open ? "1" : "0");
+}
+if (sidebarToggle)
+  sidebarToggle.onclick = () => setSidebar(sideBar.classList.contains("closed"));
 
 // Options (opt menu)
 const devtoolsOption = document.getElementById("devtools-option");
@@ -133,7 +144,7 @@ const tabItem = (tab) => {
             if (tabs.length) focusTab(tabs[tabs.length - 1]);
             else
               setTimeout(() => {
-                addTab("uvsearch.rhw.one");
+                addTab("https://www.bing.com");
               }, 100);
           }
 
@@ -168,6 +179,29 @@ const tabFrame = (tab) => {
     src: tab.proxiedUrl,
     sandbox: "allow-scripts allow-forms allow-same-origin",
     onload: (e) => {
+      // Nouvelle tentative automatique si la page d'erreur du proxy s'affiche
+      try {
+        const doc = e.target.contentDocument;
+        const isErr =
+          doc &&
+          (doc.title === "Error" ||
+            (doc.body &&
+              doc.body.textContent.includes("Error processing your request")));
+        if (isErr) {
+          tab._tries = (tab._tries || 0) + 1;
+          if (tab._tries <= 3) {
+            setTimeout(() => {
+              // Après 2 échecs, on change de serveur wisp et on réessaie
+              if (tab._tries >= 2) rotateWisp();
+              tab.view.src = tab.proxiedUrl;
+            }, 1200);
+            return;
+          }
+        } else {
+          tab._tries = 0;
+        }
+      } catch (err) {}
+
       let parts = e.target.contentWindow.location.pathname.slice(1).split("/");
       let targetUrl = decodeURIComponent(
         __uv$config.decodeUrl(parts[parts.length - 1])
@@ -248,7 +282,7 @@ async function addTab(link) {
   focusTab(tab);
 }
 
-addTab("uvsearch.rhw.one");
+addTab("https://www.bing.com");
 
 const urlParams = new URLSearchParams(window.location.search);
 
@@ -259,4 +293,12 @@ if (urlParams.has("inject") || urlParams.has("url")) {
     addTab(target);
     focusTab(tabs[tabs.length - 1]);
   }, 100);
+}
+
+// Mode épuré : ?clean=1 masque la barre latérale (utilisé par le WebOS)
+// L'état est aussi mémorisé (localStorage "uv-sidebar")
+if (urlParams.has("clean")) {
+  setSidebar(false);
+} else if (localStorage.getItem("uv-sidebar") === "0") {
+  setSidebar(false);
 }
