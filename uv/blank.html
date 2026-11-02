@@ -9,7 +9,8 @@
 <script src="/proxy/uv/uv.config.js" defer></script>
 <script type="module">
   /* Petite page d'aide : vit dans la portée du Service Worker Ultraviolet.
-     Le WebOS l'utilise pour envoyer des requêtes (POST inclus) via le proxy. */
+     Le WebOS l'utilise pour envoyer des requêtes (POST inclus) via le proxy.
+     Elle configure aussi le transport wisp (comme la page principale du proxy). */
   const sw = navigator.serviceWorker;
   const notify = () => {
     if (sw.controller && window.Ultraviolet && self.__uv$config) {
@@ -27,6 +28,11 @@
       parent.postMessage({ wosYtProxy: 'error' }, '*');
     }
   } else {
+    /* Configure le transport wisp pour le Service Worker (BareMux partagé) */
+    try {
+      const m = await import('/proxy/scripts/prxy.mjs');
+      await m.getUV('https://example.com');
+    } catch (e) { /* on tente quand même les requêtes */ }
     notify();
   }
 </script>
