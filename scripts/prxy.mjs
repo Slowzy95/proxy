@@ -47,16 +47,13 @@ export async function getUV(input) {
   let url = search(input, "https://html.duckduckgo.com/html?t=h_&q=%s");
 
   wispUrl = await pickWisp();
-  if ((await connection.getTransport()) !== "/proxy/prxy/epoxy/index.mjs") {
-    await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
-      { wisp: wispUrl },
-    ]);
-  }
-  if ((await connection.getTransport()) !== "/proxy/prxy/libcurl/libcurl.mjs") {
-    await connection.setTransport("/proxy/prxy/libcurl/libcurl.mjs", [
-      { wisp: wispUrl },
-    ]);
-  }
+  /* Toujours réappliquer le transport : le worker partagé garde sinon l'ancienne config Wisp */
+  await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
+    { wisp: wispUrl },
+  ]);
+  await connection.setTransport("/proxy/prxy/libcurl/libcurl.mjs", [
+    { wisp: wispUrl },
+  ]);
 
   let viewUrl = __uv$config.prefix + __uv$config.encodeUrl(url);
 
