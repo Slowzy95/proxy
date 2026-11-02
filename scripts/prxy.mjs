@@ -47,11 +47,8 @@ export async function getUV(input) {
   let url = search(input, "https://html.duckduckgo.com/html?t=h_&q=%s");
 
   wispUrl = await pickWisp();
-  /* Toujours réappliquer le transport : le worker partagé garde sinon l'ancienne config Wisp */
+  /* Transport Epoxy (standard Ultraviolet) — toujours réappliqué avec le Wisp choisi */
   await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
-    { wisp: wispUrl },
-  ]);
-  await connection.setTransport("/proxy/prxy/libcurl/libcurl.mjs", [
     { wisp: wispUrl },
   ]);
 
