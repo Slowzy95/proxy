@@ -17,6 +17,24 @@ export function search(input, template) {
   return template.replace("%s", encodeURIComponent(input));
 }
 
+/* Serveurs Wisp publics — le premier qui répond est utilisé (mercurywork.shop = officiel) */
+const WISP_SERVERS = ["wss://wisp.mercurywork.shop/", "wss://anura.pro/wisp/"];
+let wispUrl = WISP_SERVERS[0];
+async function pickWisp() {
+  for (const u of WISP_SERVERS) {
+    const ok = await new Promise((res) => {
+      try {
+        const ws = new WebSocket(u);
+        const t = setTimeout(() => { try { ws.close(); } catch (e) {} res(false); }, 6000);
+        ws.onopen = () => { clearTimeout(t); try { ws.close(); } catch (e) {} res(true); };
+        ws.onerror = () => { clearTimeout(t); res(false); };
+      } catch (e) { res(false); }
+    });
+    if (ok) { wispUrl = u; return u; }
+  }
+  return wispUrl;
+}
+
 export async function getUV(input) {
   try {
     await registerSW();
@@ -28,7 +46,7 @@ export async function getUV(input) {
 
   let url = search(input, "https://html.duckduckgo.com/html?t=h_&q=%s");
 
-  let wispUrl = "wss://wisp.rhw.one/";
+  wispUrl = await pickWisp();
   if ((await connection.getTransport()) !== "/proxy/prxy/epoxy/index.mjs") {
     await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
       { wisp: wispUrl },
