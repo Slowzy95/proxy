@@ -202,6 +202,36 @@ const tabFrame = (tab) => {
         }
       } catch (err) {}
 
+      /* Correctif « carrés blancs » : les srcset dont les URLs contiennent des
+         virgules (Cloudflare Image — Poki, FrAnime…) sont mal réécrits par le
+         client Ultraviolet → URLs tronquées → images en échec. Ce script
+         recharge les images cassées avec leur URL complète (attribut src
+         d'origine, intact). */
+      try {
+        const doc = e.target.contentDocument;
+        if (
+          doc &&
+          doc.body &&
+          tab.proxiedUrl.includes("/proxy/uv/service/") &&
+          !doc.defaultView.__wosImgFix
+        ) {
+          const s = doc.createElement("script");
+          s.textContent =
+            '(function(){if(window.__wosImgFix)return;window.__wosImgFix=1;' +
+            'function fix(img){try{var raw=img.getAttribute("src")||"";' +
+            'if(!/^https?:\\/\\//.test(raw))return;' +
+            'if(img.getAttribute("data-wos-fixed"))return;' +
+            'img.setAttribute("data-wos-fixed","1");' +
+            'if(img.getAttribute("srcset"))img.removeAttribute("srcset");' +
+            'img.src=raw;}catch(e){}}' +
+            'document.addEventListener("error",function(e){' +
+            'if(e.target&&e.target.tagName==="IMG")fix(e.target);},true);' +
+            'setInterval(function(){try{for(var i=0;i<document.images.length;i++){' +
+            'var im=document.images[i];if(im.complete&&im.naturalWidth===0)fix(im);}}catch(e){}},2500);})();';
+          (doc.head || doc.body).appendChild(s);
+        }
+      } catch (err) {}
+
       let parts = e.target.contentWindow.location.pathname.slice(1).split("/");
       /* Pages locales (nouvel onglet) : pas de décodage Ultraviolet */
       if (!tab.proxiedUrl.includes("/proxy/uv/service/")) {

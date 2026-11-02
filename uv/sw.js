@@ -6,7 +6,7 @@
  * However, if a user changes the location of uv.bundle.js/uv.config.js or sw.js is not relative to them, they will need to modify this script locally.
  */
 importScripts('uv.bundle.js');
-importScripts('uv.config.js?v=3'); /* v3 — inject correctif images (srcset à virgules) */
+importScripts('uv.config.js?v=4'); /* v4 — correctif images déplacé côté page proxy */
 importScripts(__uv$config.sw || 'uv.sw.js');
 
 const uv = new UVServiceWorker();
