@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nouvel onglet</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(160deg, #0b1120 0%, #101a33 60%, #0b1120 100%);
+    color: #e2e8f0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .logo i {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 21px; color: #fff;
+  }
+  .logo h1 { font-size: 22px; font-weight: 700; }
+  .logo h1 span { color: #38bdf8; }
+  form { width: 100%; max-width: 560px; display: flex; gap: 8px; }
+  input {
+    flex: 1; height: 46px; padding: 0 16px; font-size: 15px;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.07); color: #f1f5f9; outline: none;
+    transition: border .15s;
+  }
+  input:focus { border-color: #38bdf8; }
+  input::placeholder { color: #94a3b8; }
+  button[type=submit] {
+    width: 46px; height: 46px; border-radius: 12px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4); color: #fff; font-size: 16px;
+  }
+  .engines { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+  .eng {
+    padding: 6px 13px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #cbd5e1;
+    user-select: none;
+  }
+  .eng.on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.65); color: #e0f2fe; }
+  .links { display: grid; grid-template-columns: repeat(5, 76px); gap: 14px; margin-top: 34px; }
+  @media (max-width: 560px) { .links { grid-template-columns: repeat(4, 76px); } }
+  .lk {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
+    padding: 12px 4px; border-radius: 14px; border: 1px solid transparent;
+    transition: background .15s, border .15s;
+  }
+  .lk:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); }
+  .lk .ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+  .lk .nm { font-size: 11px; color: #cbd5e1; }
+  .hint { margin-top: 30px; font-size: 12px; color: #64748b; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="logo"><i>🌐</i><h1>Nouvel <span>onglet</span></h1></div>
+  <form id="f">
+    <input id="q" type="text" placeholder="Recherchez sur le web…" autofocus autocomplete="off">
+    <button type="submit" title="Rechercher">🔍</button>
+  </form>
+  <div class="engines" id="engines"></div>
+  <div class="links" id="links"></div>
+  <div class="hint">Recherchez comme sur Google, ou cliquez sur un raccourci.<br>Les résultats passent par le proxy intégré.</div>
+
+<script>
+  /* Moteur de recherche choisi */
+  var ENGINES = [
+    { id: 'google',  name: 'Google',  url: 'https://www.google.com/search?q=' },
+    { id: 'youtube', name: 'YouTube', url: 'https://www.youtube.com/results?search_query=' },
+    { id: 'bing',   name: 'Bing',    url: 'https://www.bing.com/search?q=' },
+    { id: 'ddg',    name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' }
+  ];
+  var eng = ENGINES[0];
+
+  var open = function (url) {
+    try {
+      /* Ouvre dans un onglet du proxy (même origine) */
+      if (window.parent && window.parent.wosOpen) { window.parent.wosOpen(url); return; }
+    } catch (e) {}
+    window.top.location.href = url;
+  };
+
+  /* Moteurs */
+  var engEl = document.getElementById('engines');
+  ENGINES.forEach(function (e, i) {
+    var b = document.createElement('div');
+    b.className = 'eng' + (i === 0 ? ' on' : '');
+    b.textContent = e.name;
+    b.onclick = function () {
+      eng = e;
+      engEl.querySelectorAll('.eng').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      document.getElementById('q').focus();
+    };
+    engEl.appendChild(b);
+  });
+
+  document.getElementById('f').onsubmit = function (ev) {
+    ev.preventDefault();
+    var q = document.getElementById('q').value.trim();
+    if (!q) return;
+    open(eng.url + encodeURIComponent(q));
+  };
+
+  /* Raccourcis */
+  var LINKS = [
+    { n: 'YouTube',    i: '▶️', c: '#c4302b', u: 'https://www.youtube.com' },
+    { n: 'Google',     i: '🔎', c: '#4285f4', u: 'https://www.google.com' },
+    { n: 'Wikipédia',  i: '📚', c: '#3f3f46', u: 'https://fr.wikipedia.org' },
+    { n: 'Poki',       i: '🎮', c: '#f59e0b', u: 'https://poki.com/fr' },
+    { n: 'CrazyGames', i: '🕹️', c: '#8b5cf6', u: 'https://www.crazygames.com' },
+    { n: 'FrAnime',    i: '🌸', c: '#ec4899', u: 'https://franime.fr' },
+    { n: 'Discord',    i: '💬', c: '#5865f2', u: 'https://discord.com/app' },
+    { n: 'Twitch',     i: '📺', c: '#9146ff', u: 'https://www.twitch.tv' },
+    { n: 'Spotify',    i: '🎧', c: '#1db954', u: 'https://open.spotify.com' },
+    { n: 'TikTok',     i: '🎵', c: '#000000', u: 'https://www.tiktok.com/fr' }
+  ];
+  var linksEl = document.getElementById('links');
+  LINKS.forEach(function (l) {
+    var d = document.createElement('div');
+    d.className = 'lk';
+    d.innerHTML = '<div class="ic" style="background:' + l.c + '22;border:1px solid ' + l.c + '55">' + l.i + '</div><div class="nm">' + l.n + '</div>';
+    d.onclick = function () { open(l.u); };
+    linksEl.appendChild(d);
+  });
+</script>
+</body>
+</html>

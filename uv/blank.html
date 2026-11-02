@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>WebOS</title>
+</head>
+<body>
+<script src="/proxy/uv/uv.bundle.js" defer></script>
+<script src="/proxy/uv/uv.config.js" defer></script>
+<script type="module">
+  /* Petite page d'aide : vit dans la portée du Service Worker Ultraviolet.
+     Le WebOS l'utilise pour envoyer des requêtes (POST inclus) via le proxy. */
+  const sw = navigator.serviceWorker;
+  const notify = () => {
+    if (sw.controller && window.Ultraviolet && self.__uv$config) {
+      parent.postMessage({ wosYtProxy: 'ready' }, '*');
+    } else {
+      setTimeout(notify, 150);
+    }
+  };
+  if (!sw.controller) {
+    try {
+      await sw.register('/proxy/uv/sw.js').catch(() => {});
+      await sw.ready;
+      location.reload(); /* la page devient contrôlée au rechargement */
+    } catch (e) {
+      parent.postMessage({ wosYtProxy: 'error' }, '*');
+    }
+  } else {
+    notify();
+  }
+</script>
+</body>
+</html>

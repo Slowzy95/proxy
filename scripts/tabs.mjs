@@ -51,7 +51,7 @@ pageRefresh.onclick = () => {
 };
 
 newTabButton.onclick = () => {
-  addTab("https://www.bing.com");
+  addTab("about:newtab");
 };
 
 // Barre latérale : bouton pour la masquer/réduire (logo V2, onglets)
@@ -144,7 +144,7 @@ const tabItem = (tab) => {
             if (tabs.length) focusTab(tabs[tabs.length - 1]);
             else
               setTimeout(() => {
-                addTab("https://www.bing.com");
+                addTab("about:newtab");
               }, 100);
           }
 
@@ -203,6 +203,14 @@ const tabFrame = (tab) => {
       } catch (err) {}
 
       let parts = e.target.contentWindow.location.pathname.slice(1).split("/");
+      /* Pages locales (nouvel onglet) : pas de décodage Ultraviolet */
+      if (!tab.proxiedUrl.includes("/proxy/uv/service/")) {
+        tab.title = (e.target.contentDocument && e.target.contentDocument.title) || "Nouvel onglet";
+        tabList.children[tabs.indexOf(tab)].children[1].textContent = tab.title;
+        tabList.children[tabs.indexOf(tab)].children[0].src = getFavicon("https://www.google.com");
+        if (tab == selectedTab) urlInput.value = "";
+        return;
+      }
       let targetUrl = decodeURIComponent(
         __uv$config.decodeUrl(parts[parts.length - 1])
       );
@@ -247,16 +255,21 @@ function focusTab(tab) {
 
 async function addTab(link) {
   let url;
-
-  url = await getUV(link);
-
   let tab = {};
 
-  tab.title = decodeURIComponent(
-    __uv$config.decodeUrl(url.substring(url.lastIndexOf("/") + 1))
-  ).replace(/^https?:\/\//, "");
-  tab.url = search(link);
-  tab.proxiedUrl = url;
+  if (link === "about:newtab") {
+    /* Page « nouvel onglet » locale : barre de recherche + raccourcis */
+    tab.title = "Nouvel onglet";
+    tab.url = "about:newtab";
+    tab.proxiedUrl = "newtab.html";
+  } else {
+    url = await getUV(link);
+    tab.title = decodeURIComponent(
+      __uv$config.decodeUrl(url.substring(url.lastIndexOf("/") + 1))
+    ).replace(/^https?:\/\//, "");
+    tab.url = search(link);
+    tab.proxiedUrl = url;
+  }
   tab.icon = null;
   tab.view = tabFrame(tab);
   tab.item = tabItem(tab);
@@ -282,7 +295,12 @@ async function addTab(link) {
   focusTab(tab);
 }
 
-addTab("https://www.bing.com");
+addTab("about:newtab");
+
+/* Permet à la page « nouvel onglet » (même origine) d'ouvrir des liens dans un onglet du proxy */
+window.wosOpen = (u) => {
+  addTab(u).then(() => focusTab(tabs[tabs.length - 1]));
+};
 
 const urlParams = new URLSearchParams(window.location.search);
 
