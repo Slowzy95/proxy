@@ -22,3 +22,8 @@ async function handleRequest(event) {
 self.addEventListener('fetch', (event) => {
     event.respondWith(handleRequest(event));
 });
+
+/* Mises à jour immédiates : la nouvelle version du Service Worker
+   s'active dès son installation (pas d'attente des anciens clients). */
+self.addEventListener('install', () => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
