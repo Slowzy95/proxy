@@ -46,7 +46,7 @@ export async function rotateWisp() {
   return wispUrl;
 }
 
-export async function getUV(input) {
+export async function getUV(input, wispForce) {
   try {
     await registerSW();
     rAlert("SW ✓");
@@ -57,7 +57,16 @@ export async function getUV(input) {
 
   let url = search(input, "https://html.duckduckgo.com/html?t=h_&q=%s");
 
-  wispUrl = await pickWisp();
+  /* Serveur wisp forcé (?wisp=N) — utilisé par le WebOS quand un serveur
+     est lent/bloqué : la page proxy doit REJOUER le chargement sur un
+     autre serveur sans re-sonder tous les serveurs. */
+  const forced = WISP_SERVERS[wispForce];
+  if (typeof wispForce === "number" && wispForce >= 0 && forced) {
+    wispUrl = forced;
+    wispIdx = wispForce;
+  } else {
+    wispUrl = await pickWisp();
+  }
   /* Transport Epoxy (standard Ultraviolet) — toujours réappliqué avec le Wisp choisi */
   await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
     { wisp: wispUrl },

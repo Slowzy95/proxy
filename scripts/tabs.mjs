@@ -197,8 +197,19 @@ const tabFrame = (tab) => {
             }, 1200);
             return;
           }
+          /* Abandon après 3 essais : on prévient le WebOS (page parente) */
+          try {
+            if (window.parent !== window)
+              parent.postMessage({ wosProxy: "error", url: tab.url }, "*");
+          } catch (err) {}
         } else {
           tab._tries = 0;
+          /* Signale au WebOS (page parente) que le chargement a réussi —
+             cela arrête son minuteur de secours (rotation de serveur wisp) */
+          try {
+            if (window.parent !== window)
+              parent.postMessage({ wosProxy: "loaded", url: tab.url }, "*");
+          } catch (err) {}
         }
       } catch (err) {}
 
@@ -287,13 +298,23 @@ async function addTab(link) {
   let url;
   let tab = {};
 
+  /* Serveur wisp forcé par le WebOS (?wisp=N) — si le serveur habituel est
+     lent ou bloqué (site qui charge à l'infini), le WebOS relance le
+     chargement en forçant un autre serveur, sans perdre de temps à
+     re-sonder tous les serveurs. */
+  const wispForce = (() => {
+    const w = new URLSearchParams(location.search).get("wisp");
+    const n = parseInt(w, 10);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  })();
+
   if (link === "about:newtab") {
     /* Page « nouvel onglet » locale : barre de recherche + raccourcis */
     tab.title = "Nouvel onglet";
     tab.url = "about:newtab";
     tab.proxiedUrl = "newtab.html";
   } else {
-    url = await getUV(link);
+    url = await getUV(link, wispForce);
     tab.title = decodeURIComponent(
       __uv$config.decodeUrl(url.substring(url.lastIndexOf("/") + 1))
     ).replace(/^https?:\/\//, "");
