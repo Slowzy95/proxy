@@ -22,14 +22,12 @@ export function search(input, template) {
   return template.replace("%s", encodeURIComponent(input));
 }
 
-/* Serveurs Wisp publics — le premier qui répond est utilisé. Anura en premier :
-   mercury renvoyait certaines réponses sans Content-Type (le proxy ne
-   réécrivait plus le HTML → scripts et jeux bloqués au lycée) et échouait sur
-   certains sites (ex: bloxd.io).
-   2026-11 : + lotuslearning (serveur Scramjet wisp auto-hébergé, très rapide),
-   racialequityleadership (wisp utilisé par YukiOS) et un wisp Koyeb — testés
-   actifs. Rotation plus large = moins de pannes quand un serveur public tombe. */
+/* Serveurs Wisp — 2026-11 v2 : TON serveur Render en premier (dédié, rapide,
+   IPs pas marquées → captchas Discord plus fiables). Les publics suivent en
+   secours. Si le serveur Render dort (plan gratuit), pickWisp le saute
+   automatiquement et prend le suivant. */
 const WISP_SERVERS = [
+  "wss://wisp-server-maiz.onrender.com/",
   "wss://anura.pro/wisp/",
   "wss://lotuslearning.best/wisp/",
   "wss://racialequityleadership.com/ws?reconnect=1",

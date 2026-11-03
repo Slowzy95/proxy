@@ -17,8 +17,10 @@
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
-/* Serveurs Wisp publics (index = paramètre ?wisp=N) — 2026-11 : 5 serveurs testés actifs */
+/* Serveurs Wisp (index = paramètre ?wisp=N) — ton serveur Render en premier,
+   puis 5 serveurs publics en secours */
 const WISP_SERVERS = [
+  "wss://wisp-server-maiz.onrender.com/",
   "wss://anura.pro/wisp/",
   "wss://lotuslearning.best/wisp/",
   "wss://racialequityleadership.com/ws?reconnect=1",
