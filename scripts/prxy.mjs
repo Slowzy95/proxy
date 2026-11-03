@@ -21,6 +21,7 @@ export function search(input, template) {
 const WISP_SERVERS = ["wss://wisp.mercurywork.shop/", "wss://anura.pro/wisp/"];
 let wispIdx = 0;
 let wispUrl = WISP_SERVERS[0];
+let _transportSet = null; /* dernier serveur wisp appliqué au transport */
 async function pickWisp() {
   for (const u of WISP_SERVERS) {
     const ok = await new Promise((res) => {
@@ -42,6 +43,7 @@ export async function rotateWisp() {
   wispUrl = WISP_SERVERS[wispIdx];
   try {
     await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]);
+    _transportSet = wispUrl;
   } catch (e) {}
   return wispUrl;
 }
@@ -75,12 +77,17 @@ export async function getUV(input, wispForce) {
   } else {
     wispUrl = await pickWisp();
   }
-  /* Transport Epoxy (standard Ultraviolet) — toujours réappliqué avec le Wisp choisi */
-  await withTimeout(
-    connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]),
-    10000,
-    "connexion au serveur wisp"
-  );
+  /* Transport Epoxy (standard Ultraviolet) — réappliqué SEULEMENT si le
+   serveur a changé : reconfigurer le transport pendant qu'une page est
+   affichée faisait planter le rendu (crash au clic sur les jeux). */
+  if (_transportSet !== wispUrl) {
+    await withTimeout(
+      connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]),
+      10000,
+      "connexion au serveur wisp"
+    );
+    _transportSet = wispUrl;
+  }
 
   let viewUrl = __uv$config.prefix + __uv$config.encodeUrl(url);
 
