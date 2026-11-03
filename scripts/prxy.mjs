@@ -46,9 +46,17 @@ export async function rotateWisp() {
   return wispUrl;
 }
 
+/* Évite les blocages infinis : si une étape ne répond pas, on échoue
+   proprement (le WebOS bascule alors de serveur wisp) */
+const withTimeout = (p, ms, label) =>
+  Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(label + " trop lent")), ms)),
+  ]);
+
 export async function getUV(input, wispForce) {
   try {
-    await registerSW();
+    await withTimeout(registerSW(), 8000, "enregistrement du service worker");
     rAlert("SW ✓");
   } catch (err) {
     rAlert(`SW failed to register.<br>${err.toString()}`);
@@ -68,9 +76,11 @@ export async function getUV(input, wispForce) {
     wispUrl = await pickWisp();
   }
   /* Transport Epoxy (standard Ultraviolet) — toujours réappliqué avec le Wisp choisi */
-  await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [
-    { wisp: wispUrl },
-  ]);
+  await withTimeout(
+    connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]),
+    10000,
+    "connexion au serveur wisp"
+  );
 
   let viewUrl = __uv$config.prefix + __uv$config.encodeUrl(url);
 

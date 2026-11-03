@@ -176,6 +176,8 @@ const tabItem = (tab) => {
 const tabFrame = (tab) => {
   return iframe({
     class: "tab-frame",
+    sandbox:
+      "allow-scripts allow-forms allow-same-origin allow-pointer-lock allow-downloads",
     src: tab.proxiedUrl,
     onload: (e) => {
       // Nouvelle tentative automatique si la page d'erreur du proxy s'affiche
@@ -185,7 +187,11 @@ const tabFrame = (tab) => {
           doc &&
           (doc.title === "Error" ||
             (doc.body &&
-              doc.body.textContent.includes("Error processing your request")));
+              doc.body.textContent.includes("Error processing your request")) ||
+            /* Page vide (blanche) : le serveur wisp n'a pas répondu — on
+               réessaie comme pour une erreur, sinon le site semble charger
+               à l'infini */
+            (!doc.title && doc.body && doc.body.innerHTML.trim() === ""));
         if (isErr) {
           tab._tries = (tab._tries || 0) + 1;
           if (tab._tries <= 3) {
@@ -293,6 +299,32 @@ function focusTab(tab) {
   tabList.children[tabs.indexOf(tab)].classList.add("selectedTab");
 }
 
+/* Recharge un onglet existant vers une nouvelle URL, SANS laisser la page
+   naviguer son propre cadre (ce qui fait planter le rendu Chromium à cause
+   du service worker). Le site est rechargé proprement dans un cadre tout
+   neuf — c'est ce qui fait marcher les clics sur les jeux (Poki, CrazyGames,
+   jeux .io…) qui plantaient avant. */
+async function renavTab(tab, link) {
+  try {
+    const url = await getUV(link);
+    tab.proxiedUrl = url;
+    tab.url = search(link);
+    tab._tries = 0;
+    const old = tab.view;
+    tab.view = tabFrame(tab);
+    if (old && old.parentNode) old.remove();
+    tabView.appendChild(tab.view);
+    focusTab(tab);
+  } catch (err) {
+    /* Signale l'échec au WebOS (page parente) pour qu'il bascule de serveur */
+    try {
+      if (window.parent !== window)
+        parent.postMessage({ wosProxy: "error", url: link }, "*");
+    } catch (e) {}
+    rAlert("Impossible de charger la page — réessaie");
+  }
+}
+
 async function addTab(link) {
   let url;
   let tab = {};
@@ -313,7 +345,17 @@ async function addTab(link) {
     tab.url = "about:newtab";
     tab.proxiedUrl = "newtab.html";
   } else {
-    url = await getUV(link, wispForce);
+    try {
+      url = await getUV(link, wispForce);
+    } catch (err) {
+      /* Échec du proxy (serveur wisp bloqué, SW bloqué…) : on prévient le
+         WebOS (page parente) pour qu'il bascule de serveur et réessaie */
+      try {
+        if (window.parent !== window)
+          parent.postMessage({ wosProxy: "error", url: link }, "*");
+      } catch (e) {}
+      throw err;
+    }
     tab.title = decodeURIComponent(
       __uv$config.decodeUrl(url.substring(url.lastIndexOf("/") + 1))
     ).replace(/^https?:\/\//, "");
@@ -328,11 +370,17 @@ async function addTab(link) {
     let links = tab.view.contentWindow.document.querySelectorAll("a");
     links.forEach((element) => {
       element.addEventListener("click", (event) => {
-        let isTargetTop = event.target.target === "_top";
-        if (isTargetTop) {
-          event.preventDefault();
-          addTab(event.target.href);
-        }
+        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
+        const href = element.getAttribute("href") || "";
+        if (!href || href.startsWith("javascript:") || href.startsWith("#")) return;
+        /* CORRECTIF ANTI-PLANTAGE : laisser la page naviguer son propre cadre
+           fait planter le rendu Chromium (bug avec le service worker). On
+           intercepte donc TOUS les clics sur les liens et on recharge le site
+           proprement dans le cadre (nouveau document) — comme ça, les jeux
+           (Poki, CrazyGames, .io…) se lancent sans crash. */
+        event.preventDefault();
+        event.stopPropagation();
+        renavTab(tab, element.href);
       });
     });
   });
@@ -349,7 +397,9 @@ addTab("about:newtab");
 
 /* Permet à la page « nouvel onglet » (même origine) d'ouvrir des liens dans un onglet du proxy */
 window.wosOpen = (u) => {
-  addTab(u).then(() => focusTab(tabs[tabs.length - 1]));
+  addTab(u)
+    .then(() => focusTab(tabs[tabs.length - 1]))
+    .catch(() => {});
 };
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -358,8 +408,9 @@ if (urlParams.has("inject") || urlParams.has("url")) {
   const target = urlParams.get("inject") || urlParams.get("url");
 
   setTimeout(() => {
-    addTab(target);
-    focusTab(tabs[tabs.length - 1]);
+    addTab(target)
+      .then(() => focusTab(tabs[tabs.length - 1]))
+      .catch(() => {});
   }, 100);
 }
 
