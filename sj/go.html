@@ -71,11 +71,29 @@ async function main() {
     else if (t) tell({ wosSjUrl: cur, title: t });
   };
   frame.addEventListener("urlchange", (e) => { if (e.url) { cur = e.url; sync(); } });
+  /* Page d'erreur de Scramjet (« Uh oh! There was an error loading… ») :
+     on le signale au WebOS, qui relance automatiquement une autre combinaison. */
+  let errSent = false;
+  const isErrPage = () => {
+    try {
+      const d = frame.frame.contentDocument;
+      return d && d.title === "Scramjet" && /Uh oh|error loading/i.test(d.body ? d.body.innerText : "");
+    } catch (e) { return false; }
+  };
+  const checkErr = () => {
+    if (errSent || !isErrPage()) return false;
+    errSent = true;
+    console.warn("[sj] page d'erreur Scramjet");
+    say("Échec du chargement");
+    tell({ wosProxy: "error", url: target });
+    return true;
+  };
   frame.frame.addEventListener("load", () => {
     st.classList.add("off");
+    if (checkErr()) return;
     if (!loadedSent) { loadedSent = true; tell({ wosProxy: "loaded", url: target }); }
     sync();
-    setTimeout(sync, 1500);
+    setTimeout(() => { if (!checkErr()) sync(); }, 1500);
   });
   say("Chargement…");
   frame.go(target);
