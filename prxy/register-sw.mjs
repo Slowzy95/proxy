@@ -2,7 +2,7 @@
 /**
  * Distributed with Ultraviolet and compatible with most configurations.
  */
-const stockSW = "/proxy/uv/sw.js?v=5"; /* v5 — rattrapage chunks perdus (bloxd.io) */
+const stockSW = "/proxy/uv/sw.js?v=7"; /* v7 — rattrapage chunks perdus (bloxd.io) */
 
 /**
  * List of hostnames that are allowed to run serviceworkers on http://

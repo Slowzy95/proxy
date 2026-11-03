@@ -361,6 +361,30 @@ function attachLinkGuard(tab) {
     const fdoc = tab.view.contentDocument;
     if (!fdoc || fdoc.__wosLinkGuard) return;
     fdoc.__wosLinkGuard = true;
+    /* window.open() et formulaires target=_blank : même onglet, jamais d'onglet réel */
+    const uvReal = (u) => {
+      try {
+        const x = new URL(u, location.href);
+        if (x.origin === location.origin && x.pathname.startsWith(__uv$config.prefix))
+          return __uv$config.decodeUrl(x.pathname.slice(__uv$config.prefix.length)) + x.search + x.hash;
+      } catch (e) {}
+      return u;
+    };
+    try {
+      tab.view.contentWindow.open = (u) => {
+        if (u && !/^(javascript|data|blob|about):/i.test(String(u))) renavTab(tab, uvReal(String(u)));
+        return null;
+      };
+    } catch (e) {}
+    fdoc.addEventListener(
+      "submit",
+      (ev) => {
+        const f = ev.target;
+        if (f && f.getAttribute && (f.getAttribute("target") || "").toLowerCase() === "_blank")
+          f.setAttribute("target", "_self");
+      },
+      true
+    );
     fdoc.addEventListener(
       "click",
       (event) => {

@@ -13,6 +13,29 @@ const uv = new UVServiceWorker();
 
 async function handleRequest(event) {
     if (uv.route(event)) {
+        /* Le site a calculé une URL contre l'origine RÉELLE du proxy (ex: Bloxd.io
+           « window.location.origin » → http://…/index/metrics/cookies) : la cible
+           décodée est notre propre origine. On la redirige vers le vrai site. */
+        try {
+            const rq = event.request;
+            const encPart = new URL(rq.url).pathname.slice(__uv$config.prefix.length);
+            const dec = new URL(__uv$config.decodeUrl(encPart.split('/')[0]) + (encPart.indexOf('/') > -1 ? encPart.slice(encPart.indexOf('/')) : '') + new URL(rq.url).search);
+            if (dec.origin === location.origin && !dec.pathname.startsWith('/proxy/')) {
+                let ref1 = rq.referrer || '';
+                if (!ref1.startsWith(location.origin + __uv$config.prefix)) {
+                    const c1 = event.clientId ? await self.clients.get(event.clientId) : null;
+                    if (c1 && c1.url.startsWith(location.origin + __uv$config.prefix)) ref1 = c1.url;
+                }
+                if (ref1.startsWith(location.origin + __uv$config.prefix)) {
+                    const e1 = new URL(ref1).pathname.slice(__uv$config.prefix.length).split('/')[0];
+                    const site1 = new URL(__uv$config.decodeUrl(e1));
+                    if (site1.origin !== location.origin) {
+                        const real1 = new URL(dec.pathname + dec.search, site1.origin + '/');
+                        return Response.redirect(location.origin + __uv$config.prefix + __uv$config.encodeUrl(real1.href), 307);
+                    }
+                }
+            }
+        } catch (err) {}
         return await uv.fetch(event);
     }
 
@@ -24,6 +47,32 @@ async function handleRequest(event) {
        version proxifiée — les scripts du jeu se chargent alors. */
     try {
         const req = event.request;
+        {
+            const url0 = new URL(req.url);
+            if (
+                url0.origin === location.origin &&
+                !url0.pathname.startsWith(__uv$config.prefix) &&
+                !url0.pathname.startsWith('/proxy/') &&
+                (req.method !== 'GET' || url0.pathname.startsWith('/index/'))
+            ) {
+                /* Requête d'API calculée contre la vraie origine du proxy (ex: Bloxd.io
+                   « /index/metrics/cookies » → « Can't connect to Bloxd ») : on la
+                   renvoie vers le vrai site, via le proxy (307 = méthode et corps conservés). */
+                let ref0 = req.referrer || '';
+                if (!ref0.startsWith(location.origin + __uv$config.prefix)) {
+                    const c0 = event.clientId ? await self.clients.get(event.clientId) : null;
+                    if (c0 && c0.url.startsWith(location.origin + __uv$config.prefix)) ref0 = c0.url;
+                }
+                if (ref0.startsWith(location.origin + __uv$config.prefix)) {
+                    const enc0 = new URL(ref0).pathname.slice(__uv$config.prefix.length).split('/')[0];
+                    if (enc0) {
+                        const site0 = new URL(__uv$config.decodeUrl(enc0));
+                        const real0 = new URL(url0.pathname + url0.search, site0.origin + '/');
+                        return Response.redirect(location.origin + __uv$config.prefix + __uv$config.encodeUrl(real0.href), 307);
+                    }
+                }
+            }
+        }
         if (req.method === 'GET') {
             const url = new URL(req.url);
             if (

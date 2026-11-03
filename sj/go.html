@@ -27,7 +27,7 @@ const tell = (o) => { try { parent.postMessage(o, "*"); } catch (e) {} };
 const target = P.get("url") || "https://duckduckgo.com/";
 const wispIdx = Math.max(0, Math.min(WISP_SERVERS.length - 1, parseInt(P.get("wisp") || "0", 10) || 0));
 const transport = P.get("transport") === "epoxy" ? "epoxy" : "libcurl";
-const wispUrl = WISP_SERVERS[wispIdx];
+const wispUrl = P.get("wispurl") || WISP_SERVERS[wispIdx];
 
 const withTimeout = (p, ms, label) => Promise.race([
   p, new Promise((_, rej) => setTimeout(() => rej(new Error(label + " trop lent")), ms))
