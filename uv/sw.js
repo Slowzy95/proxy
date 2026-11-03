@@ -24,34 +24,42 @@ async function handleRequest(event) {
        version proxifiée — les scripts du jeu se chargent alors. */
     try {
         const req = event.request;
-        const ref = req.referrer;
-        if (
-            req.method === 'GET' &&
-            ref && ref !== 'about:client' &&
-            ref.startsWith(location.origin + __uv$config.prefix)
-        ) {
+        if (req.method === 'GET') {
             const url = new URL(req.url);
             if (
                 url.origin === location.origin &&
                 !url.pathname.startsWith(__uv$config.prefix)
             ) {
-                const res = await fetch(req);
-                if (res.status === 404) {
-                    const refUrl = new URL(ref);
-                    const enc = refUrl.pathname
-                        .slice(__uv$config.prefix.length)
-                        .split('/')[0];
-                    if (enc) {
-                        const pageUrl = __uv$config.decodeUrl(enc);
-                        const real = new URL(url.pathname.slice(1), pageUrl);
-                        const target =
-                            location.origin +
-                            __uv$config.prefix +
-                            __uv$config.encodeUrl(real.href);
-                        return Response.redirect(target, 302);
-                    }
+                /* Le WebOS envoie les requêtes sans referer (no-referrer) :
+                   on identifie la page d'origine via le CLIENT de la requête
+                   (l'URL de l'iframe qui la fait = l'URL encodée du site). */
+                let ref = req.referrer || '';
+                if (!ref.startsWith(location.origin + __uv$config.prefix)) {
+                    const client = event.clientId
+                        ? await self.clients.get(event.clientId)
+                        : null;
+                    if (client && client.url.startsWith(location.origin + __uv$config.prefix))
+                        ref = client.url;
                 }
-                return res;
+                if (ref.startsWith(location.origin + __uv$config.prefix)) {
+                    const res = await fetch(req);
+                    if (res.status === 404) {
+                        const refUrl = new URL(ref);
+                        const enc = refUrl.pathname
+                            .slice(__uv$config.prefix.length)
+                            .split('/')[0];
+                        if (enc) {
+                            const pageUrl = __uv$config.decodeUrl(enc);
+                            const real = new URL(url.pathname.slice(1), pageUrl);
+                            const target =
+                                location.origin +
+                                __uv$config.prefix +
+                                __uv$config.encodeUrl(real.href);
+                            return Response.redirect(target, 302);
+                        }
+                    }
+                    return res;
+                }
             }
         }
     } catch (err) {}
