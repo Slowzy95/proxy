@@ -177,7 +177,7 @@ const tabFrame = (tab) => {
   return iframe({
     class: "tab-frame",
     src: tab.proxiedUrl,
-    sandbox: "allow-scripts allow-forms allow-same-origin",
+    sandbox: "allow-scripts allow-forms allow-same-origin allow-pointer-lock allow-downloads",
     onload: (e) => {
       // Nouvelle tentative automatique si la page d'erreur du proxy s'affiche
       try {
