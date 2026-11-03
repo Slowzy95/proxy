@@ -88,8 +88,52 @@ async function main() {
     tell({ wosProxy: "error", url: target });
     return true;
   };
+
+  /* ---- Garde-liens : tout reste DANS le site (jamais d'onglet réel) ----
+     - <a target=_blank>, formulaires target=_blank, window.open → même cadre
+     - appliqué aussi aux cadres internes (même origine) */
+  const PFX = "/proxy/sj/service/";
+  const realOf = (u) => {
+    try {
+      const x = new URL(u, location.href);
+      if (x.origin === location.origin && x.pathname.startsWith(PFX)) return decodeURIComponent(x.pathname.slice(PFX.length)) + x.search + x.hash;
+    } catch (e) {}
+    return u;
+  };
+  const go = (u) => {
+    if (!u || /^(javascript|data|blob|about):/i.test(u)) return;
+    try { frame.go(realOf(u)); } catch (e) { console.warn("[sj] go", e); }
+  };
+  const guardDoc = (doc, win) => {
+    if (!doc || doc.__wosGuard) return;
+    doc.__wosGuard = true;
+    doc.addEventListener("click", (ev) => {
+      const a = ev.target && ev.target.closest ? ev.target.closest("a[target]") : null;
+      if (!a) return;
+      const t = (a.getAttribute("target") || "").toLowerCase();
+      if (t && t !== "_self") a.setAttribute("target", "_self");
+    }, true);
+    doc.addEventListener("submit", (ev) => {
+      const f = ev.target;
+      if (f && f.getAttribute && (f.getAttribute("target") || "").toLowerCase() === "_blank") f.setAttribute("target", "_self");
+    }, true);
+    try {
+      win.open = function (u) { if (u) go(String(u)); return null; };
+    } catch (e) {}
+  };
+  const guardAll = () => {
+    try {
+      const w = frame.frame.contentWindow;
+      guardDoc(w.document, w);
+      w.document.querySelectorAll("iframe").forEach((f) => {
+        try { guardDoc(f.contentDocument, f.contentWindow); } catch (e) {}
+      });
+    } catch (e) {}
+  };
+  setInterval(guardAll, 700);
   frame.frame.addEventListener("load", () => {
     st.classList.add("off");
+    guardAll();
     if (checkErr()) return;
     if (!loadedSent) { loadedSent = true; tell({ wosProxy: "loaded", url: target }); }
     sync();
