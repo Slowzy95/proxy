@@ -9,7 +9,7 @@
   html, body { height: 100%; }
   body {
     font-family: 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(160deg, #0b1120 0%, #101a33 60%, #0b1120 100%);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--acc) 14%, #0b1120) 0%, color-mix(in srgb, var(--acc) 22%, #101a33) 60%, color-mix(in srgb, var(--acc) 14%, #0b1120) 100%);
     color: #e2e8f0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 100vh; padding: 24px;
@@ -17,12 +17,12 @@
   .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
   .logo i {
     width: 46px; height: 46px; border-radius: 14px;
-    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    background: linear-gradient(135deg, var(--acc), var(--acc2));
     display: flex; align-items: center; justify-content: center;
     font-size: 21px; color: #fff;
   }
   .logo h1 { font-size: 22px; font-weight: 700; }
-  .logo h1 span { color: #38bdf8; }
+  .logo h1 span { color: var(--acc2); }
   form { width: 100%; max-width: 560px; display: flex; gap: 8px; }
   input {
     flex: 1; height: 46px; padding: 0 16px; font-size: 15px;
@@ -30,11 +30,11 @@
     background: rgba(255,255,255,.07); color: #f1f5f9; outline: none;
     transition: border .15s;
   }
-  input:focus { border-color: #38bdf8; }
+  input:focus { border-color: var(--acc2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   input::placeholder { color: #94a3b8; }
   button[type=submit] {
     width: 46px; height: 46px; border-radius: 12px; border: none; cursor: pointer;
-    background: linear-gradient(135deg, #3b82f6, #06b6d4); color: #fff; font-size: 16px;
+    background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #fff; font-size: 16px;
   }
   .engines { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
   .eng {
@@ -42,7 +42,7 @@
     border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #cbd5e1;
     user-select: none;
   }
-  .eng.on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.65); color: #e0f2fe; }
+  .eng.on { background: color-mix(in srgb, var(--acc) 30%, transparent); border-color: var(--acc2); color: #e0f2fe; }
   .links { display: grid; grid-template-columns: repeat(5, 76px); gap: 14px; margin-top: 34px; }
   @media (max-width: 560px) { .links { grid-template-columns: repeat(4, 76px); } }
   .lk {
@@ -67,6 +67,23 @@
   <div class="hint">Recherchez comme sur Google, ou cliquez sur un raccourci.<br>Les résultats passent par le proxy intégré.</div>
 
 <script>
+  /* Teinte la page avec le thème choisi dans le WebOS (même origine github.io → localStorage partagé) */
+  (function () {
+    var ACCENTS = { blue: ['#2563eb', '#3b82f6'], red: ['#dc2626', '#ef4444'], purple: ['#7c3aed', '#8b5cf6'],
+      green: ['#059669', '#10b981'], orange: ['#ea580c', '#f97316'], pink: ['#db2777', '#ec4899'],
+      cyan: ['#0891b2', '#06b6d4'], gold: ['#d97706', '#f59e0b'], mono: ['#e5e7eb', '#9ca3af'],
+      indigo: ['#4f46e5', '#6366f1'], teal: ['#0d9488', '#14b8a6'], lime: ['#65a309', '#84cc16'],
+      crimson: ['#be123c', '#e11d48'], violet: ['#8b5cf6', '#a78bfa'], fuchsia: ['#d946ef', '#e879f9'],
+      emeraude: ['#10b981', '#34d399'], ambre: ['#f59e0b', '#fbbf24'], menthe: ['#2dd4bf', '#5eead4'],
+      pulsar: ['#a855f7', '#c084fc'], lave: ['#f97316', '#fb923c'] };
+    var t = 'blue';
+    try { t = localStorage.getItem('webos_theme') || 'blue'; } catch (e) {}
+    var a = ACCENTS[t] || ACCENTS.blue;
+    var s = document.documentElement.style;
+    s.setProperty('--acc', a[0]);
+    s.setProperty('--acc2', a[1]);
+  })();
+
   /* Moteur de recherche choisi */
   var ENGINES = [
     { id: 'google',  name: 'Google',  url: 'https://www.google.com/search?q=' },
