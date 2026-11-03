@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reconnexion…</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1117;color:#e5e7eb;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  body{display:flex;align-items:center;justify-content:center;text-align:center}
+  .box{max-width:420px;padding:24px}
+  .spin{width:34px;height:34px;margin:0 auto 16px;border:3px solid #374151;border-top-color:#818cf8;border-radius:50%;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  a,button{display:inline-block;margin:6px;padding:9px 16px;border-radius:8px;border:0;background:#4f46e5;color:#fff;font:inherit;text-decoration:none;cursor:pointer}
+  small{color:#9ca3af}
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="spin" id="spin"></div>
+  <div id="msg">Reconnexion au proxy…</div>
+  <div id="actions"></div>
+</div>
+<script src="/proxy/uv/uv.bundle.js"></script>
+<script src="/proxy/uv/uv.config.js"></script>
+<script type="module">
+/*
+ * Page 404 du proxy — filet de sécurité unique pour TOUS les « File not found ».
+ *
+ * 1) /proxy/uv/service/<url encodée> introuvable : le Service Worker n'était
+ *    pas actif (rechargement après une mise en veille, nouveau navigateur,
+ *    cache vidé…). On le réenregistre, on rebranche le transport Wisp puis on
+ *    recharge la même adresse : la page se charge normalement.
+ * 2) Chemin « perdu » (un jeu a calculé un chemin relatif qui sort du préfixe
+ *    du proxy) : on reconstruit la vraie URL à partir de la page parente et on
+ *    redirige vers sa version proxifiée.
+ * 3) Sinon : retour à l'accueil du proxy, jamais d'erreur GitHub brute.
+ */
+import * as BareMux from "/proxy/prxy/baremux/index.mjs";
+
+const PREFIX = "/proxy/uv/service/";
+const WISP = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+const $ = (id) => document.getElementById(id);
+const say = (t) => ($("msg").textContent = t);
+function fail(t) {
+  $("spin").style.display = "none";
+  say(t);
+  $("actions").innerHTML =
+    '<button id="retry">Réessayer</button><a href="/proxy/">Accueil du proxy</a>';
+  $("retry").onclick = () => {
+    sessionStorage.removeItem("p404:" + location.pathname);
+    location.reload();
+  };
+}
+const timeout = (p, ms) =>
+  Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("trop lent")), ms))]);
+
+async function recover() {
+  /* Garde-fou : 3 tentatives maximum par adresse (pas de boucle infinie) */
+  const key = "p404:" + location.pathname;
+  const n = +(sessionStorage.getItem(key) || 0);
+  if (n >= 3) return fail("Impossible de recharger cette page pour le moment.");
+  sessionStorage.setItem(key, String(n + 1));
+
+  const reg = await timeout(navigator.serviceWorker.register("/proxy/uv/sw.js?v=5"), 8000);
+  await timeout(navigator.serviceWorker.ready, 8000);
+  const sw = reg.active || reg.waiting || reg.installing;
+  if (sw && sw.state !== "activated") {
+    await timeout(new Promise((res) => {
+      sw.addEventListener("statechange", () => sw.state === "activated" && res());
+    }), 8000).catch(() => {});
+  }
+
+  const conn = new BareMux.BareMuxConnection("/proxy/prxy/baremux/worker.js");
+  let ok = false;
+  for (const w of WISP) {
+    try {
+      await timeout(conn.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: w }]), 10000);
+      ok = true;
+      break;
+    } catch (e) {}
+  }
+  if (!ok) return fail("Impossible de joindre le serveur du proxy.");
+  location.replace(location.href);
+}
+
+function lostPath() {
+  /* Page parente = adresse proxifiée qui a chargé ce chemin perdu */
+  let ref = "";
+  try { ref = document.referrer || (parent !== window ? parent.location.href : ""); } catch (e) {}
+  if (!ref.startsWith(location.origin + PREFIX)) return null;
+  const enc = new URL(ref).pathname.slice(PREFIX.length).split("/")[0];
+  if (!enc) return null;
+  const pageUrl = self.__uv$config.decodeUrl(enc);
+  const rel = location.pathname.startsWith("/proxy/")
+    ? location.pathname.slice("/proxy/".length)
+    : location.pathname.replace(/^\//, "");
+  const real = new URL(rel + location.search + location.hash, new URL(pageUrl).origin + "/");
+  return location.origin + PREFIX + self.__uv$config.encodeUrl(real.href);
+}
+
+try {
+  if (location.pathname.startsWith(PREFIX)) {
+    if (!("serviceWorker" in navigator)) throw new Error("no sw");
+    await recover();
+  } else {
+    const target = lostPath();
+    if (target) location.replace(target);
+    else if (window.top === window) location.replace("/proxy/");
+    else fail("Page introuvable.");
+  }
+} catch (e) {
+  fail("Impossible de recharger cette page pour le moment.");
+}
+</script>
+</body>
+</html>
