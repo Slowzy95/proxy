@@ -19,6 +19,7 @@ import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
 /* Serveurs Wisp publics (index = paramètre ?wisp=N) */
 const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+try { const c = localStorage.getItem("wos_wisp_custom"); if (c && /^wss?:\/\//i.test(c)) WISP_SERVERS.unshift(c); } catch (e) {}
 const P = new URLSearchParams(location.search);
 const st = document.getElementById("st");
 const say = (t) => { st.textContent = t; st.classList.remove("off"); };

@@ -27,6 +27,7 @@ export function search(input, template) {
    réécrivait plus le HTML → scripts et jeux bloqués au lycée) et échouait sur
    certains sites (ex: bloxd.io). */
 const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+try { const c = localStorage.getItem("wos_wisp_custom"); if (c && /^wss?:\/\//i.test(c)) WISP_SERVERS.unshift(c); } catch (e) {}
 let wispIdx = 0;
 let wispUrl = WISP_SERVERS[0];
 let _transportSet = null; /* dernier serveur wisp appliqué au transport */
