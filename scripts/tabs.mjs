@@ -304,6 +304,34 @@ function focusTab(tab) {
    du service worker). Le site est rechargé proprement dans un cadre tout
    neuf — c'est ce qui fait marcher les clics sur les jeux (Poki, CrazyGames,
    jeux .io…) qui plantaient avant. */
+/* Intercepte TOUS les clics sur les liens du site affiché (délégation
+   globale) : empêcher la page de naviguer son propre cadre évite le
+   plantage du rendu Chromium (bug avec le service worker). Le site est
+   rechargé proprement dans un cadre neuf via renavTab — c'est ce qui fait
+   marcher les clics sur les jeux (Poki, CrazyGames, .io…) qui plantaient. */
+function attachLinkGuard(tab) {
+  tab.view.addEventListener("load", () => {
+    const fdoc = tab.view.contentDocument;
+    if (!fdoc || fdoc.__wosLinkGuard) return;
+    fdoc.__wosLinkGuard = true;
+    fdoc.addEventListener(
+      "click",
+      (event) => {
+        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
+        const a =
+          event.target && event.target.closest ? event.target.closest("a") : null;
+        if (!a) return;
+        const href = a.getAttribute("href") || "";
+        if (!href || href.startsWith("javascript:") || href.startsWith("#")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        renavTab(tab, a.href);
+      },
+      true
+    );
+  });
+}
+
 async function renavTab(tab, link) {
   try {
     const url = await getUV(link);
@@ -312,6 +340,7 @@ async function renavTab(tab, link) {
     tab._tries = 0;
     const old = tab.view;
     tab.view = tabFrame(tab);
+    attachLinkGuard(tab);
     if (old && old.parentNode) old.remove();
     tabView.appendChild(tab.view);
     focusTab(tab);
@@ -365,25 +394,7 @@ async function addTab(link) {
   tab.icon = null;
   tab.view = tabFrame(tab);
   tab.item = tabItem(tab);
-
-  tab.view.addEventListener("load", () => {
-    let links = tab.view.contentWindow.document.querySelectorAll("a");
-    links.forEach((element) => {
-      element.addEventListener("click", (event) => {
-        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
-        const href = element.getAttribute("href") || "";
-        if (!href || href.startsWith("javascript:") || href.startsWith("#")) return;
-        /* CORRECTIF ANTI-PLANTAGE : laisser la page naviguer son propre cadre
-           fait planter le rendu Chromium (bug avec le service worker). On
-           intercepte donc TOUS les clics sur les liens et on recharge le site
-           proprement dans le cadre (nouveau document) — comme ça, les jeux
-           (Poki, CrazyGames, .io…) se lancent sans crash. */
-        event.preventDefault();
-        event.stopPropagation();
-        renavTab(tab, element.href);
-      });
-    });
-  });
+  attachLinkGuard(tab);
 
   tabs.push(tab);
 
