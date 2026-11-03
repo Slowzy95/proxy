@@ -338,10 +338,16 @@ async function renavTab(tab, link) {
     tab.proxiedUrl = url;
     tab.url = search(link);
     tab._tries = 0;
+    /* On détruit l'ANCIEN cadre AVANT de créer le nouveau : les deux pages
+       lourdes en même temps faisaient manquer de mémoire au rendu (crash
+       sur les jeux) — libéré d'abord, le nouveau cadre charge tranquille. */
     const old = tab.view;
+    if (old && old.parentNode) {
+      try { old.src = "about:blank"; } catch (e) {}
+      old.remove();
+    }
     tab.view = tabFrame(tab);
     attachLinkGuard(tab);
-    if (old && old.parentNode) old.remove();
     tabView.appendChild(tab.view);
     focusTab(tab);
   } catch (err) {
