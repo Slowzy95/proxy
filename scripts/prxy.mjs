@@ -25,8 +25,17 @@ export function search(input, template) {
 /* Serveurs Wisp publics — le premier qui répond est utilisé. Anura en premier :
    mercury renvoyait certaines réponses sans Content-Type (le proxy ne
    réécrivait plus le HTML → scripts et jeux bloqués au lycée) et échouait sur
-   certains sites (ex: bloxd.io). */
-const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+   certains sites (ex: bloxd.io).
+   2026-11 : + lotuslearning (serveur Scramjet wisp auto-hébergé, très rapide),
+   racialequityleadership (wisp utilisé par YukiOS) et un wisp Koyeb — testés
+   actifs. Rotation plus large = moins de pannes quand un serveur public tombe. */
+const WISP_SERVERS = [
+  "wss://anura.pro/wisp/",
+  "wss://lotuslearning.best/wisp/",
+  "wss://racialequityleadership.com/ws?reconnect=1",
+  "wss://wisp.mercurywork.shop/",
+  "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"
+];
 try { const c = localStorage.getItem("wos_wisp_custom"); if (c && /^wss?:\/\//i.test(c)) WISP_SERVERS.unshift(c); } catch (e) {}
 let wispIdx = 0;
 let wispUrl = WISP_SERVERS[0];

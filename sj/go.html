@@ -17,8 +17,14 @@
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
-/* Serveurs Wisp publics (index = paramètre ?wisp=N) */
-const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+/* Serveurs Wisp publics (index = paramètre ?wisp=N) — 2026-11 : 5 serveurs testés actifs */
+const WISP_SERVERS = [
+  "wss://anura.pro/wisp/",
+  "wss://lotuslearning.best/wisp/",
+  "wss://racialequityleadership.com/ws?reconnect=1",
+  "wss://wisp.mercurywork.shop/",
+  "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"
+];
 try { const c = localStorage.getItem("wos_wisp_custom"); if (c && /^wss?:\/\//i.test(c)) WISP_SERVERS.unshift(c); } catch (e) {}
 const P = new URLSearchParams(location.search);
 const st = document.getElementById("st");
