@@ -1,5 +1,5 @@
 import { getFavicon, rAlert } from "./utils.mjs";
-import { getUV, search, rotateWisp } from "./prxy.mjs";
+import { getUV, search, rotateWisp, currentWispIndex } from "./prxy.mjs";
 
 const { span, iframe, button, img } = van.tags;
 const {
@@ -91,7 +91,7 @@ gitOption.onclick = () => {
 
 urlForm.onsubmit = async (e) => {
   e.preventDefault();
-  selectedTab.view.src = await getUV(urlInput.value);
+  renavTab(selectedTab, urlInput.value);
 };
 
 let eruda = `fetch("https://cdn.jsdelivr.net/npm/eruda")
@@ -333,29 +333,32 @@ function attachLinkGuard(tab) {
 }
 
 async function renavTab(tab, link) {
+  /* Charge une nouvelle URL SANS laisser la page naviguer son propre cadre
+     (plantage du rendu Chromium avec le service worker) ET sans créer un
+     cadre neuf dans le même processus que la page lourde précédente
+     (manque de mémoire → crash au clic sur les jeux). Solution fiable :
+     on relance une page proxy toute neuve — dans le Web OS via la fenêtre
+     parente, en direct sinon. */
   try {
-    const url = await getUV(link);
-    tab.proxiedUrl = url;
-    tab.url = search(link);
-    tab._tries = 0;
-    /* On détruit l'ANCIEN cadre AVANT de créer le nouveau : les deux pages
-       lourdes en même temps faisaient manquer de mémoire au rendu (crash
-       sur les jeux) — libéré d'abord, le nouveau cadre charge tranquille. */
-    const old = tab.view;
-    if (old && old.parentNode) {
-      try { old.src = "about:blank"; } catch (e) {}
-      old.remove();
+    const u = search(link);
+    if (!/^https?:/.test(u)) return;
+    const inWebOS =
+      window.parent !== window && window.parent === window.parent.parent;
+    if (inWebOS) {
+      /* Dans le Web OS : on demande à la fenêtre parente de relancer la
+         navigation — page proxy neuve, processus propre, le jeu charge. */
+      parent.postMessage({ wosNav: u }, "*");
+    } else {
+      /* Proxy utilisé seul : on recharge la page proxy sur la nouvelle URL */
+      const params = new URLSearchParams();
+      params.set("url", u);
+      if (new URLSearchParams(location.search).has("clean"))
+        params.set("clean", "1");
+      const w = currentWispIndex();
+      if (w > 0) params.set("wisp", String(w));
+      location.href = "/proxy/?" + params.toString();
     }
-    tab.view = tabFrame(tab);
-    attachLinkGuard(tab);
-    tabView.appendChild(tab.view);
-    focusTab(tab);
   } catch (err) {
-    /* Signale l'échec au WebOS (page parente) pour qu'il bascule de serveur */
-    try {
-      if (window.parent !== window)
-        parent.postMessage({ wosProxy: "error", url: link }, "*");
-    } catch (e) {}
     rAlert("Impossible de charger la page — réessaie");
   }
 }

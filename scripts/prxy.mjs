@@ -48,6 +48,12 @@ export async function rotateWisp() {
   return wispUrl;
 }
 
+/* Index du serveur wisp actuellement utilisé (pour recharger la page proxy
+   sur le même serveur après un clic sur un lien) */
+export function currentWispIndex() {
+  return wispIdx;
+}
+
 /* Évite les blocages infinis : si une étape ne répond pas, on échoue
    proprement (le WebOS bascule alors de serveur wisp) */
 const withTimeout = (p, ms, label) =>
