@@ -209,6 +209,7 @@ const tabFrame = (tab) => {
           } catch (err) {}
         } else {
           tab._tries = 0;
+          tab._nestedTries = 0;
           /* Signale au WebOS (page parente) que le chargement a réussi —
              cela arrête son minuteur de secours (rotation de serveur wisp) */
           try {
@@ -304,6 +305,52 @@ function focusTab(tab) {
    du service worker). Le site est rechargé proprement dans un cadre tout
    neuf — c'est ce qui fait marcher les clics sur les jeux (Poki, CrazyGames,
    jeux .io…) qui plantaient avant. */
+
+/* Les erreurs du proxy peuvent aussi apparaître DANS un cadre imbriqué (ex: le
+   jeu intégré à CrazyGames/Poki) sans que l'onglet lui-même soit en erreur :
+   si un serveur wisp n'arrive pas à charger un site imbriqué (ex: bloxd.io sur
+   le serveur principal), seul le cadre du jeu affiche l'erreur. On surveille
+   les sous-cadres : au premier signe d'erreur, on change de serveur wisp et on
+   relance l'onglet — le jeu se charge alors sur l'autre serveur. */
+function nestedProxyError(doc, depth) {
+  if (!doc || depth > 3) return false;
+  try {
+    for (const f of doc.querySelectorAll("iframe")) {
+      let d = null;
+      try {
+        d = f.contentDocument;
+      } catch (err) {}
+      if (!d) continue;
+      const isErr =
+        d.title === "Error" ||
+        (d.body &&
+          d.body.textContent.includes("Error processing your request")) ||
+        (d.querySelector && d.querySelector("#errorMessage"));
+      if (isErr || nestedProxyError(d, depth + 1)) return true;
+    }
+  } catch (err) {}
+  return false;
+}
+
+setInterval(() => {
+  const tab = selectedTab;
+  if (!tab || !tab.view) return;
+  if (!tab.proxiedUrl || !tab.proxiedUrl.includes("/proxy/uv/service/")) return;
+  let doc = null;
+  try {
+    doc = tab.view.contentDocument;
+  } catch (err) {
+    return;
+  }
+  if (!doc || !nestedProxyError(doc, 0)) return;
+  tab._nestedTries = (tab._nestedTries || 0) + 1;
+  /* Abandon après 3 essais : on garde la page telle quelle */
+  if (tab._nestedTries > 3) return;
+  rotateWisp();
+  setTimeout(() => {
+    tab.view.src = tab.proxiedUrl;
+  }, 400);
+}, 4500);
 /* Intercepte TOUS les clics sur les liens du site affiché (délégation
    globale) : empêcher la page de naviguer son propre cadre évite le
    plantage du rendu Chromium (bug avec le service worker). Le site est
@@ -325,7 +372,18 @@ function attachLinkGuard(tab) {
         if (!href || href.startsWith("javascript:") || href.startsWith("#")) return;
         event.preventDefault();
         event.stopPropagation();
-        renavTab(tab, a.href);
+        /* CrazyGames : sa page de jeu charge un chargeur (gameframe) v2.13 dont
+           les modules ne passent pas le proxy (les jeux ne démarrent jamais).
+           On ouvre directement le cadre du jeu, qui fonctionne avec le
+           chargeur par défaut. */
+        let target = a.href;
+        const cg =
+          target &&
+          target.match(/^https?:\/\/(?:www\.)?crazygames\.com\/game\/([\w-]+)/);
+        if (cg)
+          target =
+            "https://games.crazygames.com/fr_FR/" + cg[1] + "/index.html";
+        renavTab(tab, target);
       },
       true
     );
