@@ -4,6 +4,11 @@ import { getFavicon, rAlert } from "./utils.mjs";
 
 const connection = new BareMux.BareMuxConnection("/proxy/prxy/baremux/worker.js");
 
+/* Transport choisi (?transport=libcurl|epoxy) — Epoxy par défaut pour UV */
+const TRANSPORT = new URLSearchParams(location.search).get("transport") === "libcurl" ? "libcurl" : "epoxy";
+const TRANSPORT_PATH = TRANSPORT === "libcurl" ? "/proxy/prxy/libcurl/index.mjs" : "/proxy/prxy/epoxy/index.mjs";
+const transportOpts = (u) => (TRANSPORT === "libcurl" ? [{ websocket: u, wisp: u }] : [{ wisp: u }]);
+
 export function search(input, template) {
   try {
     return new URL(input).toString();
@@ -45,7 +50,7 @@ export async function rotateWisp() {
   wispIdx = (wispIdx + 1) % WISP_SERVERS.length;
   wispUrl = WISP_SERVERS[wispIdx];
   try {
-    await connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]);
+    await connection.setTransport(TRANSPORT_PATH, transportOpts(wispUrl));
     _transportSet = wispUrl;
   } catch (e) {}
   return wispUrl;
@@ -91,7 +96,7 @@ export async function getUV(input, wispForce) {
    affichée faisait planter le rendu (crash au clic sur les jeux). */
   if (_transportSet !== wispUrl) {
     await withTimeout(
-      connection.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]),
+      connection.setTransport(TRANSPORT_PATH, transportOpts(wispUrl)),
       10000,
       "connexion au serveur wisp"
     );

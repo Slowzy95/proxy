@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scramjet</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b1020;color:#cbd5e1;font:14px system-ui,sans-serif;overflow:hidden}
+  #sjf{position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff}
+  #st{position:fixed;left:12px;bottom:10px;padding:4px 10px;border-radius:8px;background:rgba(15,23,42,.8);z-index:5;transition:opacity .4s}
+  #st.off{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="st">Connexion…</div>
+<script src="/proxy/sj/scramjet.all.js"></script>
+<script type="module">
+import * as BareMux from "/proxy/prxy/baremux/index.mjs";
+
+/* Serveurs Wisp publics (index = paramètre ?wisp=N) */
+const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
+const P = new URLSearchParams(location.search);
+const st = document.getElementById("st");
+const say = (t) => { st.textContent = t; st.classList.remove("off"); };
+const tell = (o) => { try { parent.postMessage(o, "*"); } catch (e) {} };
+
+const target = P.get("url") || "https://duckduckgo.com/";
+const wispIdx = Math.max(0, Math.min(WISP_SERVERS.length - 1, parseInt(P.get("wisp") || "0", 10) || 0));
+const transport = P.get("transport") === "epoxy" ? "epoxy" : "libcurl";
+const wispUrl = WISP_SERVERS[wispIdx];
+
+const withTimeout = (p, ms, label) => Promise.race([
+  p, new Promise((_, rej) => setTimeout(() => rej(new Error(label + " trop lent")), ms))
+]);
+
+async function main() {
+  if (!navigator.serviceWorker) throw new Error("Service worker indisponible (https requis)");
+  const { ScramjetController } = $scramjetLoadController();
+  const scramjet = new ScramjetController({
+    prefix: "/proxy/sj/service/",
+    files: {
+      wasm: "/proxy/sj/scramjet.wasm.wasm",
+      all: "/proxy/sj/scramjet.all.js",
+      sync: "/proxy/sj/scramjet.sync.js",
+    },
+  });
+  await withTimeout(scramjet.init(), 8000, "initialisation Scramjet");
+
+  say("Service worker…");
+  await withTimeout(navigator.serviceWorker.register("/proxy/sj/sw.js?v=1", { scope: "/proxy/sj/" }), 8000, "enregistrement du service worker");
+  await withTimeout(navigator.serviceWorker.ready, 8000, "service worker");
+
+  say("Transport " + transport + "…");
+  const conn = new BareMux.BareMuxConnection("/proxy/prxy/baremux/worker.js");
+  const tpath = transport === "epoxy" ? "/proxy/prxy/epoxy/index.mjs" : "/proxy/prxy/libcurl/index.mjs";
+  const topt = transport === "epoxy" ? [{ wisp: wispUrl }] : [{ websocket: wispUrl, wisp: wispUrl }];
+  await withTimeout(conn.setTransport(tpath, topt), 12000, "connexion au serveur wisp");
+
+  const frame = scramjet.createFrame();
+  frame.frame.id = "sjf";
+  document.body.appendChild(frame.frame);
+  window.sjFrame = frame;
+
+  let cur = target;
+  let loadedSent = false;
+  const pageTitle = () => { try { return frame.frame.contentDocument.title || ""; } catch (e) { return ""; } };
+  const sync = () => {
+    const t = pageTitle();
+    if (t) document.title = t;
+    if (cur && cur !== target) tell({ wosSjUrl: cur, title: t });
+    else if (t) tell({ wosSjUrl: cur, title: t });
+  };
+  frame.addEventListener("urlchange", (e) => { if (e.url) { cur = e.url; sync(); } });
+  frame.frame.addEventListener("load", () => {
+    st.classList.add("off");
+    if (!loadedSent) { loadedSent = true; tell({ wosProxy: "loaded", url: target }); }
+    sync();
+    setTimeout(sync, 1500);
+  });
+  say("Chargement…");
+  frame.go(target);
+  window.sjDone = true;
+}
+
+main().catch((err) => {
+  console.error("[sj]", err);
+  say("Échec : " + (err && err.message || err));
+  tell({ wosProxy: "error", url: target });
+  window.sjError = String(err && err.message || err);
+});
+</script>
+</body>
+</html>

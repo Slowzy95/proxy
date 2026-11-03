@@ -98,8 +98,16 @@ function lostPath() {
   return location.origin + PREFIX + self.__uv$config.encodeUrl(real.href);
 }
 
+const SJ_PREFIX = "/proxy/sj/service/";
 try {
-  if (location.pathname.startsWith(PREFIX)) {
+  if (location.pathname.startsWith(SJ_PREFIX)) {
+    /* Adresse Scramjet perdue (service worker absent) : go.html le réinstalle
+       puis recharge la même adresse réelle. */
+    let real = "";
+    try { real = decodeURIComponent((location.pathname + location.search + location.hash).slice(SJ_PREFIX.length)); } catch (e) {}
+    if (/^https?:\/\//.test(real)) location.replace("/proxy/sj/go.html?url=" + encodeURIComponent(real));
+    else location.replace("/proxy/");
+  } else if (location.pathname.startsWith(PREFIX)) {
     if (!("serviceWorker" in navigator)) throw new Error("no sw");
     await recover();
   } else {
