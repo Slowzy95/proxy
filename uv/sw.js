@@ -15,7 +15,47 @@ async function handleRequest(event) {
     if (uv.route(event)) {
         return await uv.fetch(event);
     }
-    
+
+    /* Rattrapage « fichiers perdus » : certains sites (ex: Bloxd.io) calculent
+       des URLs de scripts RELATIVES qui, une fois proxifiés, sortent du préfixe
+       du proxy (ex: /proxy/static/js/... → 404). Si la requête vient d'une page
+       affichée via le proxy (referer encodé) et renvoie un 404, on reconstruit
+       la vraie URL (page d'origine + chemin relatif) et on redirige vers sa
+       version proxifiée — les scripts du jeu se chargent alors. */
+    try {
+        const req = event.request;
+        const ref = req.referrer;
+        if (
+            req.method === 'GET' &&
+            ref && ref !== 'about:client' &&
+            ref.startsWith(location.origin + __uv$config.prefix)
+        ) {
+            const url = new URL(req.url);
+            if (
+                url.origin === location.origin &&
+                !url.pathname.startsWith(__uv$config.prefix)
+            ) {
+                const res = await fetch(req);
+                if (res.status === 404) {
+                    const refUrl = new URL(ref);
+                    const enc = refUrl.pathname
+                        .slice(__uv$config.prefix.length)
+                        .split('/')[0];
+                    if (enc) {
+                        const pageUrl = __uv$config.decodeUrl(enc);
+                        const real = new URL(url.pathname.slice(1), pageUrl);
+                        const target =
+                            location.origin +
+                            __uv$config.prefix +
+                            __uv$config.encodeUrl(real.href);
+                        return Response.redirect(target, 302);
+                    }
+                }
+                return res;
+            }
+        }
+    } catch (err) {}
+
     return await fetch(event.request)
 }
 
