@@ -84,14 +84,21 @@
     s.setProperty('--acc2', a[1]);
   })();
 
-  /* Moteur de recherche choisi */
+  /* Moteur de recherche choisi — Startpage en premier : ce sont les résultats
+     GOOGLE servis par un autre domaine, ça passe même là où Google est bloqué (lycée). */
   var ENGINES = [
+    { id: 'startpage', name: 'Startpage (Google)', url: 'https://www.startpage.com/sp/search?query=' },
     { id: 'google',  name: 'Google',  url: 'https://www.google.com/search?q=' },
     { id: 'youtube', name: 'YouTube', url: 'https://www.youtube.com/results?search_query=' },
     { id: 'bing',   name: 'Bing',    url: 'https://www.bing.com/search?q=' },
     { id: 'ddg',    name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=' }
   ];
-  var eng = ENGINES[0];
+  /* Même origine que le Web OS : on reprend le moteur choisi dans le navigateur intégré */
+  var savedEng = null;
+  try { savedEng = localStorage.getItem('webos_engine'); } catch (e) {}
+  var eng = null;
+  for (var i = 0; i < ENGINES.length; i++) { if (ENGINES[i].id === savedEng) { eng = ENGINES[i]; break; } }
+  if (!eng) eng = ENGINES[0];
 
   var open = function (url) {
     try {
@@ -105,7 +112,7 @@
   var engEl = document.getElementById('engines');
   ENGINES.forEach(function (e, i) {
     var b = document.createElement('div');
-    b.className = 'eng' + (i === 0 ? ' on' : '');
+    b.className = 'eng' + (e === eng ? ' on' : '');
     b.textContent = e.name;
     b.onclick = function () {
       eng = e;
