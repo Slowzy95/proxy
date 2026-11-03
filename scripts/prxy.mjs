@@ -17,8 +17,11 @@ export function search(input, template) {
   return template.replace("%s", encodeURIComponent(input));
 }
 
-/* Serveurs Wisp publics — le premier qui répond est utilisé (mercurywork.shop = officiel) */
-const WISP_SERVERS = ["wss://wisp.mercurywork.shop/", "wss://anura.pro/wisp/"];
+/* Serveurs Wisp publics — le premier qui répond est utilisé. Anura en premier :
+   mercury renvoyait certaines réponses sans Content-Type (le proxy ne
+   réécrivait plus le HTML → scripts et jeux bloqués au lycée) et échouait sur
+   certains sites (ex: bloxd.io). */
+const WISP_SERVERS = ["wss://anura.pro/wisp/", "wss://wisp.mercurywork.shop/"];
 let wispIdx = 0;
 let wispUrl = WISP_SERVERS[0];
 let _transportSet = null; /* dernier serveur wisp appliqué au transport */
