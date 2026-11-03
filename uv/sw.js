@@ -50,7 +50,17 @@ async function handleRequest(event) {
                             .split('/')[0];
                         if (enc) {
                             const pageUrl = __uv$config.decodeUrl(enc);
-                            const real = new URL(url.pathname.slice(1), pageUrl);
+                            /* Le site a résolu son chemin relatif contre la
+                               racine du proxy (/proxy/) : on remplace par la
+                               racine du VRAI site (ex: /proxy/static/js/x.js
+                               → https://bloxd.io/static/js/x.js). */
+                            const rel = url.pathname.startsWith('/proxy/')
+                                ? url.pathname.slice('/proxy/'.length)
+                                : url.pathname.replace(/^\//, '');
+                            const real = new URL(
+                                rel,
+                                new URL(pageUrl).origin + '/'
+                            );
                             const target =
                                 location.origin +
                                 __uv$config.prefix +
