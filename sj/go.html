@@ -17,9 +17,11 @@
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
-/* Serveurs Wisp (index = paramètre ?wisp=N) — ton serveur Render en premier,
-   puis les serveurs publics vivants en secours (les 3 morts retirés le 04/11/2026) */
+/* Serveurs Wisp (index = paramètre ?wisp=N) — le relais Cloudflare (gate-s95)
+   en premier (passe les pare-feux), puis ton serveur Render direct, puis les
+   serveurs publics vivants en secours */
 const WISP_SERVERS = [
+  "wss://gate-s95.slowzy.workers.dev/",
   "wss://wisp-server-maiz.onrender.com/",
   "wss://wisp.mercurywork.shop/",
   "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"

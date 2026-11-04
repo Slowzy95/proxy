@@ -22,13 +22,13 @@ export function search(input, template) {
   return template.replace("%s", encodeURIComponent(input));
 }
 
-/* Serveurs Wisp — 2026-11 v3 : TON serveur Render en premier (dédié, rapide,
-   IPs pas marquées → captchas Discord plus fiables). Les publics suivent en
-   secours. anura.pro, lotuslearning.best et racialequityleadership.com sont
-   morts (vérifié le 04/11/2026) → retirés ; il reste les 2 publics vivants.
-   Si le serveur Render dort (plan gratuit), pickWisp le saute
-   automatiquement et prend le suivant. */
+/* Serveurs Wisp — 2026-11 v4 : le RELAIS Cloudflare (gate-s95) en premier —
+   il fait passer les connexions pour du HTTPS normal vers workers.dev, donc
+   il passe les pare-feux qui bloquent onrender.com. Puis ton serveur Render
+   direct (plus rapide quand le réseau ne le bloque pas), puis les 2 publics
+   vivants en secours. */
 const WISP_SERVERS = [
+  "wss://gate-s95.slowzy.workers.dev/",
   "wss://wisp-server-maiz.onrender.com/",
   "wss://wisp.mercurywork.shop/",
   "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"
