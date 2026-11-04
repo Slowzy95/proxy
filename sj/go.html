@@ -18,12 +18,9 @@
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
 /* Serveurs Wisp (index = paramètre ?wisp=N) — ton serveur Render en premier,
-   puis 5 serveurs publics en secours */
+   puis les serveurs publics vivants en secours (les 3 morts retirés le 04/11/2026) */
 const WISP_SERVERS = [
   "wss://wisp-server-maiz.onrender.com/",
-  "wss://anura.pro/wisp/",
-  "wss://lotuslearning.best/wisp/",
-  "wss://racialequityleadership.com/ws?reconnect=1",
   "wss://wisp.mercurywork.shop/",
   "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"
 ];

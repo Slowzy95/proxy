@@ -22,15 +22,14 @@ export function search(input, template) {
   return template.replace("%s", encodeURIComponent(input));
 }
 
-/* Serveurs Wisp — 2026-11 v2 : TON serveur Render en premier (dédié, rapide,
+/* Serveurs Wisp — 2026-11 v3 : TON serveur Render en premier (dédié, rapide,
    IPs pas marquées → captchas Discord plus fiables). Les publics suivent en
-   secours. Si le serveur Render dort (plan gratuit), pickWisp le saute
+   secours. anura.pro, lotuslearning.best et racialequityleadership.com sont
+   morts (vérifié le 04/11/2026) → retirés ; il reste les 2 publics vivants.
+   Si le serveur Render dort (plan gratuit), pickWisp le saute
    automatiquement et prend le suivant. */
 const WISP_SERVERS = [
   "wss://wisp-server-maiz.onrender.com/",
-  "wss://anura.pro/wisp/",
-  "wss://lotuslearning.best/wisp/",
-  "wss://racialequityleadership.com/ws?reconnect=1",
   "wss://wisp.mercurywork.shop/",
   "wss://hurt-agata-liventcord-api-7072e9a6.koyeb.app/"
 ];
