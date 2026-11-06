@@ -14,6 +14,7 @@
 <body>
 <div id="st">Connexion…</div>
 <script src="/proxy/sj/scramjet.all.js"></script>
+<script src="/proxy/scripts/open-page.js"></script>
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 
@@ -97,9 +98,7 @@ async function main() {
     return true;
   };
 
-  /* ---- Garde-liens : tout reste DANS le site (jamais d'onglet réel) ----
-     - <a target=_blank>, formulaires target=_blank, window.open → même cadre
-     - appliqué aussi aux cadres internes (même origine) */
+  /* Keep new browsing contexts separate from the running game/video. */
   const PFX = "/proxy/sj/service/";
   const realOf = (u) => {
     try {
@@ -116,27 +115,34 @@ async function main() {
     if (!doc || doc.__wosGuard) return;
     doc.__wosGuard = true;
     doc.addEventListener("click", (ev) => {
-      const a = ev.target && ev.target.closest ? ev.target.closest("a[target]") : null;
+      const a = ev.target && ev.target.closest ? ev.target.closest("a") : null;
       if (!a) return;
       const t = (a.getAttribute("target") || "").toLowerCase();
-      if (t && t !== "_self") a.setAttribute("target", "_self");
+      if (t === "_blank" || (t && !["_self", "_parent", "_top"].includes(t)) || ev.ctrlKey || ev.metaKey || ev.shiftKey) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        window.wosOpenPage(realOf(a.href));
+      }
     }, true);
-    doc.addEventListener("submit", (ev) => {
-      const f = ev.target;
-      if (f && f.getAttribute && (f.getAttribute("target") || "").toLowerCase() === "_blank") f.setAttribute("target", "_self");
-    }, true);
+    // Leave form method, body and target intact, notably for authentication.
     try {
-      win.open = function (u) { if (u) go(String(u)); return null; };
+      const nativeOpen = win.open.bind(win);
+      win.open = function (u, target, features) {
+        if (target && ["_self", "_parent", "_top"].includes(String(target).toLowerCase()))
+          return nativeOpen(u, target, features);
+        return u ? window.wosOpenPage(realOf(new URL(String(u), doc.baseURI).href)) : nativeOpen(u, target, features);
+      };
     } catch (e) {}
   };
   const guardAll = () => {
-    try {
-      const w = frame.frame.contentWindow;
-      guardDoc(w.document, w);
-      w.document.querySelectorAll("iframe").forEach((f) => {
-        try { guardDoc(f.contentDocument, f.contentWindow); } catch (e) {}
-      });
-    } catch (e) {}
+    const walk = (w, depth) => {
+      if (depth > 6) return;
+      try {
+        guardDoc(w.document, w);
+        w.document.querySelectorAll("iframe").forEach(f => walk(f.contentWindow, depth + 1));
+      } catch (e) {}
+    };
+    walk(frame.frame.contentWindow, 0);
   };
   setInterval(guardAll, 700);
   frame.frame.addEventListener("load", () => {
