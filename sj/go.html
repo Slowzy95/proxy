@@ -14,9 +14,10 @@
 <body>
 <div id="st">Connexion…</div>
 <script src="/proxy/sj/scramjet.all.js"></script>
-<script src="/proxy/scripts/open-page.js?v=42"></script>
+<script src="/proxy/scripts/open-page.js?v=43"></script>
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
+import { ensureProxyTransport } from "/proxy/scripts/transport.mjs?v=43";
 
 /* Serveurs Wisp (index = paramètre ?wisp=N) — le relais Cloudflare (gate-s95)
    en premier (passe les pare-feux), puis ton serveur Render direct, puis les
@@ -63,7 +64,7 @@ async function main() {
   const conn = new BareMux.BareMuxConnection("/proxy/prxy/baremux/worker.js");
   const tpath = transport === "epoxy" ? "/proxy/prxy/epoxy/index.mjs" : "/proxy/prxy/libcurl/index.mjs";
   const topt = transport === "epoxy" ? [{ wisp: wispUrl }] : [{ websocket: wispUrl, wisp: wispUrl }];
-  await withTimeout(conn.setTransport(tpath, topt), 12000, "connexion au serveur wisp");
+  await withTimeout(ensureProxyTransport(conn, tpath, topt), 12000, "connexion au serveur wisp");
 
   const frame = scramjet.createFrame();
   frame.frame.id = "sjf";

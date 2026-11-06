@@ -20,8 +20,8 @@
   <div id="msg">Reconnexion au proxy…</div>
   <div id="actions"></div>
 </div>
-<script src="/proxy/uv/uv.bundle.js"></script>
-<script src="/proxy/uv/uv.config.js"></script>
+<script src="/proxy/uv/uv.bundle.js?v=43"></script>
+<script src="/proxy/uv/uv.config.js?v=43"></script>
 <script type="module">
 /*
  * Page 404 du proxy — filet de sécurité unique pour TOUS les « File not found ».
@@ -36,6 +36,7 @@
  * 3) Sinon : retour à l'accueil du proxy, jamais d'erreur GitHub brute.
  */
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
+import { ensureProxyTransport } from "/proxy/scripts/transport.mjs?v=43";
 
 const PREFIX = "/proxy/uv/service/";
 const WISP = [
@@ -62,13 +63,13 @@ const timeout = (p, ms) =>
   Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("trop lent")), ms))]);
 
 async function recover() {
-  /* Garde-fou : 3 tentatives maximum par adresse (pas de boucle infinie) */
+  /* One recovery only, never reset another tab's transport. */
   const key = "p404:" + location.pathname;
   const n = +(sessionStorage.getItem(key) || 0);
-  if (n >= 3) return fail("Impossible de recharger cette page pour le moment.");
+  if (n >= 1) return fail("Le proxy ne peut pas charger cette ressource. Réessayez ou ouvrez le site officiel.");
   sessionStorage.setItem(key, String(n + 1));
 
-  const reg = await timeout(navigator.serviceWorker.register("/proxy/uv/sw.js?v=5"), 8000);
+  const reg = await timeout(navigator.serviceWorker.register("/proxy/uv/sw.js?v=8", { scope: "/proxy/uv/", updateViaCache: "none" }), 8000);
   await timeout(navigator.serviceWorker.ready, 8000);
   const sw = reg.active || reg.waiting || reg.installing;
   if (sw && sw.state !== "activated") {
@@ -78,15 +79,12 @@ async function recover() {
   }
 
   const conn = new BareMux.BareMuxConnection("/proxy/prxy/baremux/worker.js");
-  let ok = false;
-  for (const w of WISP) {
-    try {
-      await timeout(conn.setTransport("/proxy/prxy/epoxy/index.mjs", [{ wisp: w }]), 10000);
-      ok = true;
-      break;
-    } catch (e) {}
-  }
-  if (!ok) return fail("Impossible de joindre le serveur du proxy.");
+  let wisp = "wss://gate-s95.slowzy.workers.dev/";
+  try {
+    const custom = localStorage.getItem("wos_wisp_custom");
+    if (custom && /^wss?:\/\//i.test(custom)) wisp = custom;
+  } catch (e) {}
+  await timeout(ensureProxyTransport(conn, "/proxy/prxy/epoxy/index.mjs", [{ wisp }], { reuseExisting: true }), 10000);
   location.replace(location.href);
 }
 
@@ -108,6 +106,9 @@ function lostPath() {
 const SJ_PREFIX = "/proxy/sj/service/";
 try {
   if (location.pathname.startsWith(SJ_PREFIX)) {
+    const key = "p404sj:" + location.pathname;
+    if (sessionStorage.getItem(key)) throw new Error("Scramjet : ressource indisponible");
+    sessionStorage.setItem(key, "1");
     /* Adresse Scramjet perdue (service worker absent) : go.html le réinstalle
        puis recharge la même adresse réelle. */
     let real = "";

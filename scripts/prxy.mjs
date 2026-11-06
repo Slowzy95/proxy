@@ -1,4 +1,5 @@
 import { registerSW } from "/proxy/prxy/register-sw.mjs";
+import { ensureProxyTransport } from "./transport.mjs?v=43";
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 import { getFavicon, rAlert } from "./utils.mjs";
 
@@ -57,7 +58,7 @@ export async function rotateWisp() {
   wispIdx = (wispIdx + 1) % WISP_SERVERS.length;
   wispUrl = WISP_SERVERS[wispIdx];
   try {
-    await connection.setTransport(TRANSPORT_PATH, transportOpts(wispUrl));
+    await ensureProxyTransport(connection, TRANSPORT_PATH, transportOpts(wispUrl));
     _transportSet = wispUrl;
   } catch (e) {}
   return wispUrl;
@@ -77,7 +78,7 @@ const withTimeout = (p, ms, label) =>
     new Promise((_, rej) => setTimeout(() => rej(new Error(label + " trop lent")), ms)),
   ]);
 
-export async function getUV(input, wispForce) {
+export async function getUV(input, wispForce, { reuseExisting = false } = {}) {
   try {
     await withTimeout(registerSW(), 8000, "enregistrement du service worker");
     rAlert("SW ✓");
@@ -103,7 +104,7 @@ export async function getUV(input, wispForce) {
    affichée faisait planter le rendu (crash au clic sur les jeux). */
   if (_transportSet !== wispUrl) {
     await withTimeout(
-      connection.setTransport(TRANSPORT_PATH, transportOpts(wispUrl)),
+      ensureProxyTransport(connection, TRANSPORT_PATH, transportOpts(wispUrl), { reuseExisting }),
       10000,
       "connexion au serveur wisp"
     );

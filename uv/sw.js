@@ -5,14 +5,31 @@
  * Ideally, this will be registered under the scope in uv.config.js so it will not need to be modified.
  * However, if a user changes the location of uv.bundle.js/uv.config.js or sw.js is not relative to them, they will need to modify this script locally.
  */
-importScripts('uv.bundle.js');
-importScripts('uv.config.js?v=4'); /* v4 — correctif images déplacé côté page proxy */
+importScripts('uv.bundle.js?v=43');
+importScripts('uv.config.js?v=43');
 importScripts(__uv$config.sw || 'uv.sw.js');
 
 const uv = new UVServiceWorker();
 
+function canonicalRelativeProxyURL(requestURL) {
+    const url = new URL(requestURL);
+    const encoded = url.pathname.slice(__uv$config.prefix.length);
+    const slash = encoded.indexOf('/');
+    if (slash < 0) return null;
+    try {
+        const base = new URL(__uv$config.decodeUrl(encoded.slice(0, slash)));
+        if (!/^https?:$/.test(base.protocol)) return null;
+        // A literal slash after the encoded URL is an un-rewritten relative
+        // webpack chunk. Decode only the base, never XOR-decode the raw tail.
+        const real = new URL(encoded.slice(slash + 1) + url.search, base);
+        return location.origin + __uv$config.prefix + __uv$config.encodeUrl(real.href);
+    } catch (e) { return null; }
+}
 async function handleRequest(event) {
     if (uv.route(event)) {
+        const canonical = canonicalRelativeProxyURL(event.request.url);
+        if (canonical && canonical !== event.request.url)
+            return Response.redirect(canonical, 307);
         /* Le site a calculé une URL contre l'origine RÉELLE du proxy (ex: Bloxd.io
            « window.location.origin » → http://…/index/metrics/cookies) : la cible
            décodée est notre propre origine. On la redirige vers le vrai site. */
