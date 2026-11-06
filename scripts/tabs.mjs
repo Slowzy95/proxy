@@ -1,5 +1,5 @@
 import { getFavicon, rAlert } from "./utils.mjs";
-import { getUV, search, rotateWisp, currentWispIndex } from "./prxy.mjs";
+import { getUV, search, rotateWisp, currentWispIndex } from "./prxy.mjs?v=43";
 
 const { span, iframe, button, img } = van.tags;
 const {
@@ -185,7 +185,7 @@ const tabFrame = (tab) => {
         const doc = e.target.contentDocument;
         const isErr =
           doc &&
-          (doc.title === "Error" ||
+          (doc.title === "Error" || /^Reconnexion|^Ultraviolet Error/i.test(doc.title) ||
             (doc.body &&
               doc.body.textContent.includes("Error processing your request")) ||
             /* Page vide (blanche) : le serveur wisp n'a pas répondu — on
@@ -194,14 +194,8 @@ const tabFrame = (tab) => {
             (!doc.title && doc.body && doc.body.innerHTML.trim() === ""));
         if (isErr) {
           tab._tries = (tab._tries || 0) + 1;
-          if (tab._tries <= 3) {
-            setTimeout(() => {
-              // Après 2 échecs, on change de serveur wisp et on réessaie
-              if (tab._tries >= 2) rotateWisp();
-              tab.view.src = tab.proxiedUrl;
-            }, 1200);
-            return;
-          }
+          // The parent owns bounded retries. A frame must not rotate the
+          // shared transport and disconnect games in other tabs.
           /* Abandon après 3 essais : on prévient le WebOS (page parente) */
           try {
             if (window.parent !== window)
@@ -343,13 +337,10 @@ setInterval(() => {
     return;
   }
   if (!doc || !nestedProxyError(doc, 0)) return;
-  tab._nestedTries = (tab._nestedTries || 0) + 1;
-  /* Abandon après 3 essais : on garde la page telle quelle */
-  if (tab._nestedTries > 3) return;
-  rotateWisp();
-  setTimeout(() => {
-    tab.view.src = tab.proxiedUrl;
-  }, 400);
+  if (tab._nestedErrorNotified) return;
+  tab._nestedErrorNotified = true;
+  if (parent !== window) parent.postMessage({ wosProxy: "error", url: tab.url }, "*");
+  else rAlert("Une ressource du jeu ne passe pas le proxy. Choisissez un autre moteur ou ouvrez le site officiel ; les autres onglets sont conservés.");
 }, 4500);
 /* Intercepte TOUS les clics sur les liens du site affiché (délégation
    globale) : empêcher la page de naviguer son propre cadre évite le

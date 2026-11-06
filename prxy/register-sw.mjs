@@ -2,7 +2,7 @@
 /**
  * Distributed with Ultraviolet and compatible with most configurations.
  */
-const stockSW = "/proxy/uv/sw.js?v=7"; /* v7 — rattrapage chunks perdus (bloxd.io) */
+const stockSW = "/proxy/uv/sw.js?v=8"; /* v8 — one canonical worker, refreshed imports */
 
 /**
  * List of hostnames that are allowed to run serviceworkers on http://
@@ -24,5 +24,5 @@ export async function registerSW() {
     throw new Error("Your browser doesn't support service workers.");
   }
 
-  await navigator.serviceWorker.register(stockSW);
+  await navigator.serviceWorker.register(stockSW, { scope: "/proxy/uv/", updateViaCache: "none" });
 }

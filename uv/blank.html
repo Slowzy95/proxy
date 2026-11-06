@@ -5,8 +5,8 @@
 <title>WebOS</title>
 </head>
 <body>
-<script src="/proxy/uv/uv.bundle.js" defer></script>
-<script src="/proxy/uv/uv.config.js" defer></script>
+<script src="/proxy/uv/uv.bundle.js?v=43" defer></script>
+<script src="/proxy/uv/uv.config.js?v=43" defer></script>
 <script type="module">
   /* Petite page d'aide : vit dans la portée du Service Worker Ultraviolet.
      Le WebOS l'utilise pour envoyer des requêtes (POST inclus) via le proxy.
@@ -21,7 +21,7 @@
   };
   if (!sw.controller) {
     try {
-      await sw.register('/proxy/uv/sw.js').catch(() => {});
+      await sw.register('/proxy/uv/sw.js?v=8', { scope: '/proxy/uv/', updateViaCache: 'none' }).catch(() => {});
       await sw.ready;
       location.reload(); /* la page devient contrôlée au rechargement */
     } catch (e) {
@@ -30,8 +30,8 @@
   } else {
     /* Configure le transport wisp pour le Service Worker (BareMux partagé) */
     try {
-      const m = await import('/proxy/scripts/prxy.mjs');
-      await m.getUV('https://example.com');
+      const m = await import('/proxy/scripts/prxy.mjs?v=43');
+      await m.getUV('https://example.com', undefined, { reuseExisting: true });
     } catch (e) { /* on tente quand même les requêtes */ }
     notify();
   }
