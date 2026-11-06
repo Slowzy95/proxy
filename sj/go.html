@@ -18,6 +18,7 @@
 <script type="module">
 import * as BareMux from "/proxy/prxy/baremux/index.mjs";
 import { ensureProxyTransport } from "/proxy/scripts/transport.mjs?v=43";
+import { monitorFrame, createLoadNotice } from "/proxy/scripts/load-state.mjs?v=44";
 
 /* Serveurs Wisp (index = paramètre ?wisp=N) — le relais Cloudflare (gate-s95)
    en premier (passe les pare-feux), puis ton serveur Render direct, puis les
@@ -32,7 +33,7 @@ try { const c = localStorage.getItem("wos_wisp_custom"); if (c && /^wss?:\/\//i.
 const P = new URLSearchParams(location.search);
 const st = document.getElementById("st");
 const say = (t) => { st.textContent = t; st.classList.remove("off"); };
-const tell = (o) => { try { parent.postMessage(o, "*"); } catch (e) {} };
+const tell = (o) => { try { parent.postMessage({ ...o, ...(o.wosProxy ? { request: P.get("request") || "" } : {}) }, "*"); } catch (e) {} };
 
 const target = P.get("url") || "https://duckduckgo.com/";
 const wispIdx = Math.max(0, Math.min(WISP_SERVERS.length - 1, parseInt(P.get("wisp") || "0", 10) || 0));
@@ -72,7 +73,6 @@ async function main() {
   window.sjFrame = frame;
 
   let cur = target;
-  let loadedSent = false;
   const pageTitle = () => { try { return frame.frame.contentDocument.title || ""; } catch (e) { return ""; } };
   const sync = () => {
     const t = pageTitle();
@@ -147,15 +147,33 @@ async function main() {
   };
   setInterval(guardAll, 700);
   frame.frame.addEventListener("load", () => {
-    st.classList.add("off");
     guardAll();
     if (checkErr()) return;
-    if (!loadedSent) { loadedSent = true; tell({ wosProxy: "loaded", url: target }); }
     sync();
     setTimeout(() => { if (!checkErr()) sync(); }, 1500);
   });
   say("Chargement…");
   frame.go(target);
+  let monitor;
+  const notice = createLoadNotice({
+    target,
+    onRetry: () => location.reload(),
+    onStop: () => {
+      monitor?.stop();
+      try { frame.frame.contentWindow.stop(); } catch {}
+      tell({ wosProxy: "stalled", url: target });
+    }
+  });
+  monitor = monitorFrame(frame.frame, {
+    maxMs: /(^|\.)discord\.com$/.test(new URL(target).hostname) ? 180000 : 90000,
+    onState: state => {
+      notice.show(state);
+      if (state.phase === "ready") st.classList.add("off");
+      tell({ wosProxy: state.phase === "ready" ? "loaded" :
+        ["error", "stalled"].includes(state.phase) ? state.phase : "progress",
+        url: target, elapsed: state.elapsed, resources: state.resources });
+    }
+  });
   window.sjDone = true;
 }
 

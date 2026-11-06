@@ -10,7 +10,7 @@ const TRANSPORT = new URLSearchParams(location.search).get("transport") === "lib
 const TRANSPORT_PATH = TRANSPORT === "libcurl" ? "/proxy/prxy/libcurl/index.mjs" : "/proxy/prxy/epoxy/index.mjs";
 const transportOpts = (u) => (TRANSPORT === "libcurl" ? [{ websocket: u, wisp: u }] : [{ wisp: u }]);
 
-export function search(input, template) {
+export function search(input, template = "https://html.duckduckgo.com/html?t=h_&q=%s") {
   try {
     return new URL(input).toString();
   } catch (err) {}
