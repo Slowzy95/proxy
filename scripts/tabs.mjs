@@ -1,5 +1,13 @@
 import { getFavicon, rAlert } from "./utils.mjs";
-import { getUV, search, rotateWisp, currentWispIndex } from "./prxy.mjs?v=43";
+import { getUV, search, rotateWisp, currentWispIndex } from "./prxy.mjs?v=44";
+import { monitorFrame, createLoadNotice } from "./load-state.mjs?v=44";
+
+const requestID = new URLSearchParams(location.search).get("request") || "";
+const reportProxy = (phase, tab, extra = {}) => {
+  if (parent !== window) parent.postMessage({
+    wosProxy: phase, url: tab.requestURL || tab.url, request: requestID, ...extra
+  }, "*");
+};
 
 const { span, iframe, button, img } = van.tags;
 const {
@@ -148,6 +156,8 @@ const tabItem = (tab) => {
               }, 100);
           }
 
+          tab._loadMonitor?.stop();
+          tab._loadNotice?.remove();
           tabView.removeChild(tab.view);
           tab.view.remove();
 
@@ -180,38 +190,9 @@ const tabFrame = (tab) => {
       "allow-scripts allow-forms allow-same-origin allow-pointer-lock allow-downloads allow-popups allow-popups-to-escape-sandbox",
     src: tab.proxiedUrl,
     onload: (e) => {
-      // Nouvelle tentative automatique si la page d'erreur du proxy s'affiche
-      try {
-        const doc = e.target.contentDocument;
-        const isErr =
-          doc &&
-          (doc.title === "Error" || /^Reconnexion|^Ultraviolet Error/i.test(doc.title) ||
-            (doc.body &&
-              doc.body.textContent.includes("Error processing your request")) ||
-            /* Page vide (blanche) : le serveur wisp n'a pas répondu — on
-               réessaie comme pour une erreur, sinon le site semble charger
-               à l'infini */
-            (!doc.title && doc.body && doc.body.innerHTML.trim() === ""));
-        if (isErr) {
-          tab._tries = (tab._tries || 0) + 1;
-          // The parent owns bounded retries. A frame must not rotate the
-          // shared transport and disconnect games in other tabs.
-          /* Abandon après 3 essais : on prévient le WebOS (page parente) */
-          try {
-            if (window.parent !== window)
-              parent.postMessage({ wosProxy: "error", url: tab.url }, "*");
-          } catch (err) {}
-        } else {
-          tab._tries = 0;
-          tab._nestedTries = 0;
-          /* Signale au WebOS (page parente) que le chargement a réussi —
-             cela arrête son minuteur de secours (rotation de serveur wisp) */
-          try {
-            if (window.parent !== window)
-              parent.postMessage({ wosProxy: "loaded", url: tab.url }, "*");
-          } catch (err) {}
-        }
-      } catch (err) {}
+      // A freshly attached iframe can emit load for its initial blank
+      // document. It is neither a successful application nor a proxy error.
+      try { if (!e.target.contentDocument || e.target.contentDocument.URL === "about:blank") return; } catch {}
 
       /* Correctif « carrés blancs » : les srcset dont les URLs contiennent des
          virgules (Cloudflare Image — Poki, FrAnime…) sont mal réécrits par le
@@ -282,10 +263,12 @@ const tabFrame = (tab) => {
 
 function focusTab(tab) {
   if (selectedTab) {
+    selectedTab._loadNotice?.setActive(false);
     selectedTab.view.style.display = "none";
     tabList.children[tabs.indexOf(selectedTab)].classList.remove("selectedTab");
   }
   selectedTab = tab;
+  tab._loadNotice?.setActive(true);
   tab.view.style.display = "block";
 
   // Update URL bar
@@ -339,8 +322,9 @@ setInterval(() => {
   if (!doc || !nestedProxyError(doc, 0)) return;
   if (tab._nestedErrorNotified) return;
   tab._nestedErrorNotified = true;
-  if (parent !== window) parent.postMessage({ wosProxy: "error", url: tab.url }, "*");
-  else rAlert("Une ressource du jeu ne passe pas le proxy. Choisissez un autre moteur ou ouvrez le site officiel ; les autres onglets sont conservés.");
+  // An advertisement/challenge iframe failing is not a failure of the main
+  // application. Never discard a working game because of a child frame.
+  console.warn("Une ressource imbriquée ne passe pas le proxy ; la page principale est conservée.");
 }, 4500);
 /* Intercepte TOUS les clics sur les liens du site affiché (délégation
    globale) : empêcher la page de naviguer son propre cadre évite le
@@ -446,6 +430,7 @@ async function renavTab(tab, link) {
 async function addTab(link) {
   let url;
   let tab = {};
+  tab.requestURL = link;
 
   /* Serveur wisp forcé par le WebOS (?wisp=N) — si le serveur habituel est
      lent ou bloqué (site qui charge à l'infini), le WebOS relance le
@@ -470,7 +455,7 @@ async function addTab(link) {
          WebOS (page parente) pour qu'il bascule de serveur et réessaie */
       try {
         if (window.parent !== window)
-          parent.postMessage({ wosProxy: "error", url: link }, "*");
+          reportProxy("error", tab);
       } catch (e) {}
       throw err;
     }
@@ -491,6 +476,29 @@ async function addTab(link) {
 
   tabView.appendChild(tab.view);
   focusTab(tab);
+  if (link !== "about:newtab") {
+    const notice = createLoadNotice({
+      target: search(link),
+      onRetry: () => location.reload(),
+      onStop: () => {
+        tab._loadMonitor?.stop();
+        try { tab.view.contentWindow.stop(); } catch {}
+        reportProxy("stalled", tab);
+      }
+    });
+    tab._loadNotice = notice;
+    notice.setActive(tab === selectedTab);
+    tab._loadMonitor = monitorFrame(tab.view, {
+      maxMs: /(^|\.)discord\.com$/.test(new URL(search(link)).hostname) ? 180000 : 90000,
+      onState: state => {
+        tab._ready = state.phase === "ready";
+        notice.show(state);
+        reportProxy(state.phase === "ready" ? "loaded" :
+          ["error", "stalled"].includes(state.phase) ? state.phase : "progress", tab,
+          { elapsed: state.elapsed, resources: state.resources });
+      }
+    });
+  }
 }
 
 addTab("about:newtab");
