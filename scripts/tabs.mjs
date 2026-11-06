@@ -177,7 +177,7 @@ const tabFrame = (tab) => {
   return iframe({
     class: "tab-frame",
     sandbox:
-      "allow-scripts allow-forms allow-same-origin allow-pointer-lock allow-downloads",
+      "allow-scripts allow-forms allow-same-origin allow-pointer-lock allow-downloads allow-popups allow-popups-to-escape-sandbox",
     src: tab.proxiedUrl,
     onload: (e) => {
       // Nouvelle tentative automatique si la page d'erreur du proxy s'affiche
@@ -357,11 +357,13 @@ setInterval(() => {
    rechargé proprement dans un cadre neuf via renavTab — c'est ce qui fait
    marcher les clics sur les jeux (Poki, CrazyGames, .io…) qui plantaient. */
 function attachLinkGuard(tab) {
-  tab.view.addEventListener("load", () => {
-    const fdoc = tab.view.contentDocument;
+  const guard = (fdoc, win, root) => {
     if (!fdoc || fdoc.__wosLinkGuard) return;
     fdoc.__wosLinkGuard = true;
-    /* window.open() et formulaires target=_blank : même onglet, jamais d'onglet réel */
+    fdoc.addEventListener("load", ev => {
+      if (ev.target?.tagName === "IFRAME") scan();
+    }, true);
+    /* New windows must not replace the running game/video. */
     const uvReal = (u) => {
       try {
         const x = new URL(u, location.href);
@@ -371,47 +373,52 @@ function attachLinkGuard(tab) {
       return u;
     };
     try {
-      tab.view.contentWindow.open = (u) => {
-        if (u && !/^(javascript|data|blob|about):/i.test(String(u))) renavTab(tab, uvReal(String(u)));
-        return null;
+      const nativeOpen = win.open.bind(win);
+      win.open = (u, target, features) => {
+        if (target && ["_self", "_parent", "_top"].includes(String(target).toLowerCase()))
+          return nativeOpen(u, target, features);
+        return u ? window.wosOpenPage(uvReal(new URL(String(u), fdoc.baseURI).href)) : nativeOpen(u, target, features);
       };
     } catch (e) {}
-    fdoc.addEventListener(
-      "submit",
-      (ev) => {
-        const f = ev.target;
-        if (f && f.getAttribute && (f.getAttribute("target") || "").toLowerCase() === "_blank")
-          f.setAttribute("target", "_self");
-      },
-      true
-    );
+    // Native form submissions retain their body and destination context.
     fdoc.addEventListener(
       "click",
       (event) => {
-        if (event.defaultPrevented || event.ctrlKey || event.metaKey) return;
+        if (event.defaultPrevented) return;
         const a =
           event.target && event.target.closest ? event.target.closest("a") : null;
         if (!a) return;
         const href = a.getAttribute("href") || "";
         if (!href || href.startsWith("javascript:") || href.startsWith("#")) return;
+        const context = (a.getAttribute("target") || "").toLowerCase();
+        if (context === "_blank" || (context && !["_self", "_parent", "_top"].includes(context)) ||
+            event.ctrlKey || event.metaKey || event.shiftKey) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          window.wosOpenPage(uvReal(a.href));
+          return;
+        }
+        // Nested frames (games, verification widgets) own their normal links.
+        if (!root) return;
         event.preventDefault();
         event.stopPropagation();
-        /* CrazyGames : sa page de jeu charge un chargeur (gameframe) v2.13 dont
-           les modules ne passent pas le proxy (les jeux ne démarrent jamais).
-           On ouvre directement le cadre du jeu, qui fonctionne avec le
-           chargeur par défaut. */
-        let target = a.href;
-        const cg =
-          target &&
-          target.match(/^https?:\/\/(?:www\.)?crazygames\.com\/game\/([\w-]+)/);
-        if (cg)
-          target =
-            "https://games.crazygames.com/fr_FR/" + cg[1] + "/index.html";
-        renavTab(tab, target);
+        // Preserve official destinations; do not invent third-party game URLs.
+        renavTab(tab, uvReal(a.href));
       },
       true
     );
-  });
+  };
+  const scan = () => {
+    const walk = (win, depth) => {
+      if (depth > 6) return;
+      try {
+        guard(win.document, win, depth === 0);
+        win.document.querySelectorAll("iframe").forEach(f => walk(f.contentWindow, depth + 1));
+      } catch (e) { /* Other-origin frames keep their native behavior. */ }
+    };
+    walk(tab.view.contentWindow, 0);
+  };
+  tab.view.addEventListener("load", scan);
 }
 
 async function renavTab(tab, link) {
